@@ -1,20 +1,59 @@
-<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Tiny Civilization</title>
+  <title>Tiny Civilization – Armies & Shop</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <canvas id="game"></canvas>
 
-  <div id="ui">
-    <div id="title">Tiny Civilization</div>
+  <div id="ui-left">
+    <div id="shop-title">SHOP</div>
+    <div id="shop-coins">Coins: 0</div>
+    <div id="shop-list">
+      <!-- Buildings -->
+      <button class="shop-item" data-type="house">House (50c)</button>
+      <button class="shop-item" data-type="farm">Farm (80c)</button>
+      <button class="shop-item" data-type="market">Market (150c)</button>
+      <button class="shop-item" data-type="temple">Temple (200c)</button>
+      <button class="shop-item" data-type="barracks">Barracks (250c)</button>
+      <button class="shop-item" data-type="forge">Forge (220c)</button>
+      <button class="shop-item" data-type="tower">Watch Tower (180c)</button>
+
+      <!-- Army units -->
+      <div class="shop-section-label">Army Units</div>
+      <button class="shop-item" data-type="knight">Knight (120c)</button>
+      <button class="shop-item" data-type="archer">Archer (100c)</button>
+      <button classclass="shop-item" data-type="mage">Mage (160c)</button>
+      <button class="shop-item" data-type="spearman">Spearman (90c)</button>
+
+      <!-- Upgrades -->
+      <div class="shop-section-label">Upgrades</div>
+      <button class="shop-item" data-type="armor1">Armor I (300c)</button>
+      <button class="shop-item" data-type="armor2">Armor II (600c)</button>
+      <button class="shop-item" data-type="weapon1">Weapons I (280c)</button>
+      <button class="shop-item" data-type="weapon2">Weapons II (550c)</button>
+      <button class="shop-item" data-type="training">Training Grounds (400c)</button>
+      <button class="shop-item" data-type="banner">War Banner (350c)</button>
+      <button class="shop-item" data-type="healer">Healer (200c)</button>
+      <button class="shop-item" data-type="siege">Siege Engine (500c)</button>
+    </div>
+
+    <div id="raid-panel">
+      <div class="raid-title">RAID TARGETS</div>
+      <button class="raid-btn" data-diff="easy">Bandit Camp (Easy)</button>
+      <button class="raid-btn" data-diff="medium">Fortified Village (Medium)</button>
+      <button class="raid-btn" data-diff="hard">Dark Fortress (Hard)</button>
+    </div>
+  </div>
+
+  <div id="ui-top">
+    <div id="title">Tiny Civilization – Armies & War</div>
     <div id="help">
-      WASD = move · Mouse = select tile · Left click = build<br />
-      1: House (50c) · 2: Farm (80c) · 3: Market (150c) · 4: Hire Person (30c near house)<br />
-      E = talk (near person) · R = center camera
+      WASD = move · Mouse = select tile · Left click = build/place<br />
+      1–3 = building mode · 4 = hire near house · E = talk · R = center camera<br />
+      Army control: Hold SHIFT + click on ground to set army rally point.
     </div>
     <div id="stats"></div>
     <div id="dialog"></div>
