@@ -3,28 +3,23 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Tiny Planet Builder</title>
+  <title>Tiny Planet People</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <canvas id="game"></canvas>
+
   <div id="ui">
-    <div id="title">Tiny Planet Builder</div>
-    <div id="info">
-      Left click: place building · Right click: remove building · Mouse wheel: zoom · Drag: rotate planet
+    <div id="title">Tiny Planet People</div>
+    <div id="help">
+      WASD = move · Mouse = aim · Left click = attack<br />
+      E = talk (when near villager) · R = respawn
     </div>
-    <div id="toolbar">
-      <button data-type="house" class="tool selected">House</button>
-      <button data-type="tree" class="tool">Tree</button>
-      <button data-type="farm" class="tool">Farm</button>
-      <button data-type="tower" class="tool">Tower</button>
-      <button data-type="clear" id="clearBtn">Clear Planet</button>
-    </div>
-    <div id="stats">
-      <span id="popStat">Population: 0</span>
-      <span id="happinessStat">Happiness: 100</span>
+    <div id="panel">
+      <div id="stats"></div>
+      <div id="dialog"></div>
     </div>
   </div>
-  <canvas id="game"></canvas>
 
   <script src="main.js"></script>
 </body>
