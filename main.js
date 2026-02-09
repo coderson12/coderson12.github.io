@@ -47,22 +47,25 @@ let battleEnemyBuildings = [];  // enemy town
 let battleResultTimer = 0;
 let battleVictory = false;
 
+// projectiles (arrows, etc.)
+let projectiles = []; // {x,y,vx,vy,damage,fromEnemy}
+
 const buildingDefs = {
-  house: { name: "House", cost: 50, color: "#ffdd77", income: 1, pop: 2 },
-  farm: { name: "Farm", cost: 80, color: "#88c96b", income: 3, pop: 0 },
-  market: { name: "Market", cost: 150, color: "#ff8f8f", income: 6, pop: 0 },
-  temple: { name: "Temple", cost: 200, color: "#c9a6ff", income: 2, pop: 0 },
-  barracks: { name: "Barracks", cost: 250, color: "#9f7f5f", income: 1, pop: 0 },
-  forge: { name: "Forge", cost: 220, color: "#c96b3b", income: 2, pop: 0 },
-  tower: { name: "Tower", cost: 180, color: "#a0b0ff", income: 1, pop: 0 }
+  house:   { name: "House",   cost: 50,  color: "#ffdd77", income: 1, pop: 2 },
+  farm:    { name: "Farm",    cost: 80,  color: "#88c96b", income: 3, pop: 0 },
+  market:  { name: "Market",  cost: 150, color: "#ff8f8f", income: 6, pop: 0 },
+  temple:  { name: "Temple",  cost: 200, color: "#c9a6ff", income: 2, pop: 0 },
+  barracks:{ name: "Barracks",cost: 250, color: "#9f7f5f", income: 1, pop: 0 },
+  forge:   { name: "Forge",   cost: 220, color: "#c96b3b", income: 2, pop: 0 },
+  tower:   { name: "Tower",   cost: 180, color: "#a0b0ff", income: 1, pop: 0 }
 };
 
 const armyDefs = {
-  knight: { name: "Knight", cost: 120, hp: 80, atk: 10, range: 12 },
-  archer: { name: "Archer", cost: 100, hp: 55, atk: 8, range: 60 },
-  mage: { name: "Mage", cost: 160, hp: 45, atk: 14, range: 50 },
-  spearman: { name: "Spearman", cost: 90, hp: 60, atk: 9, range: 18 },
-  siege: { name: "Siege Engine", cost: 500, hp: 200, atk: 25, range: 70 }
+  knight:   { name: "Knight",   cost: 120, hp: 80,  atk: 10, range: 12 },
+  archer:   { name: "Archer",   cost: 100, hp: 55,  atk: 8,  range: 80 },
+  mage:     { name: "Mage",     cost: 160, hp: 45,  atk: 14, range: 50 },
+  spearman: { name: "Spearman", cost: 90,  hp: 60,  atk: 9,  range: 18 },
+  siege:    { name: "Siege",    cost: 500, hp: 200, atk: 25, range: 90 }
 };
 
 let upgrades = {
@@ -159,7 +162,6 @@ canvas.addEventListener("mousedown", e => {
   if (e.button === 0) {
     mouse.down = true;
     if (mouse.shift) {
-      // rally works both in world and in battle
       setArmyRally();
     } else if (!inBattle) {
       handleClick();
@@ -305,7 +307,7 @@ function tryTalk() {
 }
 
 function updatePlayer(dt) {
-  if (inBattle) return; // player stays home during battle
+  if (inBattle) return;
 
   let mx = 0;
   let my = 0;
@@ -550,30 +552,33 @@ function startRaid(diff) {
   battleEnemyUnits = [];
   battleEnemyBuildings = [];
   battleVictory = false;
+  projectiles = [];
 
   let enemyCount, enemyHp, enemyAtk, buildingCount;
   if (diff === "easy") {
-    enemyCount = 6;
-    enemyHp = 40;
-    enemyAtk = 6;
-    buildingCount = 4;
+    enemyCount = 12;
+    enemyHp = 60;
+    enemyAtk = 7;
+    buildingCount = 30;
   } else if (diff === "medium") {
-    enemyCount = 10;
-    enemyHp = 70;
-    enemyAtk = 9;
-    buildingCount = 6;
+    enemyCount = 20;
+    enemyHp = 90;
+    enemyAtk = 10;
+    buildingCount = 36;
   } else {
-    enemyCount = 16;
-    enemyHp = 110;
-    enemyAtk = 12;
-    buildingCount = 8;
+    enemyCount = 30;
+    enemyHp = 130;
+    enemyAtk = 13;
+    buildingCount = 40;
   }
 
+  // enemy army: mix of melee + archers
   for (let i = 0; i < enemyCount; i++) {
+    const isArcher = i % 3 === 0;
     battleEnemyUnits.push({
       x: 200 + Math.random() * 80,
       y: (i - enemyCount / 2) * 18,
-      type: "enemy",
+      type: isArcher ? "enemy_archer" : "enemy_melee",
       hp: enemyHp,
       maxHp: enemyHp,
       atk: enemyAtk,
@@ -581,14 +586,37 @@ function startRaid(diff) {
     });
   }
 
-  for (let i = 0; i < buildingCount; i++) {
+  // enemy base: grid of houses + towers
+  const cols = 8;
+  const rows = Math.ceil(buildingCount / cols);
+  let placed = 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (placed >= buildingCount) break;
+      const type = (placed % 7 === 0) ? "tower" : "house";
+      battleEnemyBuildings.push({
+        x: 260 + c * 22,
+        y: -60 + r * 22,
+        hp: type === "tower" ? 120 : 70,
+        maxHp: type === "tower" ? 120 : 70,
+        destroyed: false,
+        fireTime: 0,
+        type
+      });
+      placed++;
+    }
+  }
+
+  // extra watchtowers
+  for (let i = 0; i < 5; i++) {
     battleEnemyBuildings.push({
-      x: 260 + (i % 4) * 20,
-      y: -40 + Math.floor(i / 4) * 24,
-      hp: 60,
-      maxHp: 60,
+      x: 260 + (i * 26),
+      y: -120,
+      hp: 140,
+      maxHp: 140,
       destroyed: false,
-      fireTime: 0
+      fireTime: 0,
+      type: "tower"
     });
   }
 
@@ -602,6 +630,21 @@ function startRaid(diff) {
   dialogEl.textContent = "Your army marches to battle!";
 }
 
+function spawnProjectile(x, y, tx, ty, damage, fromEnemy) {
+  const dx = tx - x;
+  const dy = ty - y;
+  const d = Math.hypot(dx, dy) || 1;
+  const speed = 140;
+  projectiles.push({
+    x,
+    y,
+    vx: (dx / d) * speed,
+    vy: (dy / d) * speed,
+    damage,
+    fromEnemy
+  });
+}
+
 function updateBattle(dt) {
   for (const u of armyUnits) {
     u.animTime += dt * 6;
@@ -610,7 +653,7 @@ function updateBattle(dt) {
     e.animTime += dt * 6;
   }
 
-  // army movement: rally if set, otherwise advance toward enemy center
+  // army movement: rally or push toward enemy center
   let armyTarget = null;
   if (armyRally) {
     armyTarget = { x: armyRally.x, y: armyRally.y };
@@ -638,6 +681,14 @@ function updateBattle(dt) {
       if (d > 4) {
         let speed = 40;
         if (upgrades.training) speed += 20;
+
+        // slow if walking through barracks (dirt)
+        const tileX = Math.floor(u.x / TILE_SIZE);
+        const tileY = Math.floor(u.y / TILE_SIZE);
+        const slowHere = battleEnemyBuildings.some(b => b.type === "barracks" && !b.destroyed &&
+          Math.abs(b.x / TILE_SIZE - tileX) < 1 && Math.abs(b.y / TILE_SIZE - tileY) < 1);
+        if (slowHere) speed *= 0.6;
+
         const nx = dx / d;
         const ny = dy / d;
         u.x += nx * speed * dt;
@@ -646,7 +697,7 @@ function updateBattle(dt) {
     }
   }
 
-  // enemy movement: chase nearest player unit
+  // enemy movement: melee chase, archers keep distance and shoot
   for (const e of battleEnemyUnits) {
     let target = null;
     let bestDist = Infinity;
@@ -659,10 +710,30 @@ function updateBattle(dt) {
         target = u;
       }
     }
-    if (target) {
-      const dx = target.x - e.x;
-      const dy = target.y - e.y;
-      const d = Math.hypot(dx, dy);
+    if (!target) continue;
+
+    const dx = target.x - e.x;
+    const dy = target.y - e.y;
+    const d = Math.hypot(dx, dy);
+
+    if (e.type === "enemy_archer") {
+      const desired = 70;
+      if (d > desired + 10) {
+        const nx = dx / d;
+        const ny = dy / d;
+        e.x += nx * 30 * dt;
+        e.y += ny * 30 * dt;
+      } else if (d < desired - 10) {
+        const nx = dx / d;
+        const ny = dy / d;
+        e.x -= nx * 30 * dt;
+        e.y -= ny * 30 * dt;
+      }
+
+      if (d <= 100 && Math.random() < 2 * dt) {
+        spawnProjectile(e.x, e.y, target.x, target.y, e.atk * 0.7, true);
+      }
+    } else {
       if (d > 4) {
         const nx = dx / d;
         const ny = dy / d;
@@ -675,10 +746,11 @@ function updateBattle(dt) {
   separateUnits(armyUnits, 12, dt);
   separateUnits(battleEnemyUnits, 12, dt);
 
-  // combat: army vs enemy
+  // combat: army vs enemy (melee + archers shooting)
   for (const u of armyUnits) {
     const def = armyDefs[u.type];
     if (!def) continue;
+
     let best = null;
     let bestDist = Infinity;
     for (const e of battleEnemyUnits) {
@@ -691,14 +763,24 @@ function updateBattle(dt) {
         best = e;
       }
     }
-    if (best && bestDist <= def.range) {
-      const weaponBonus = upgrades.weaponLevel * 4;
-      const bannerBonus = upgrades.banner ? 5 : 0;
-      best.hp -= (def.atk + weaponBonus + bannerBonus) * dt;
+
+    if (!best) continue;
+
+    const weaponBonus = upgrades.weaponLevel * 4;
+    const bannerBonus = upgrades.banner ? 5 : 0;
+
+    if (u.type === "archer") {
+      if (bestDist <= def.range && Math.random() < 3 * dt) {
+        spawnProjectile(u.x, u.y, best.x, best.y, def.atk + weaponBonus + bannerBonus, false);
+      }
+    } else {
+      if (bestDist <= def.range) {
+        best.hp -= (def.atk + weaponBonus + bannerBonus) * dt;
+      }
     }
   }
 
-  // enemy vs army
+  // enemy vs army (melee)
   for (const e of battleEnemyUnits) {
     if (e.hp <= 0) continue;
     let best = null;
@@ -712,7 +794,7 @@ function updateBattle(dt) {
         best = u;
       }
     }
-    if (best && bestDist <= 20) {
+    if (best && bestDist <= 20 && e.type === "enemy_melee") {
       best.hp -= e.atk * dt;
     }
   }
@@ -737,10 +819,36 @@ function updateBattle(dt) {
     }
   }
 
+  // projectiles update
+  for (const p of projectiles) {
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+
+    if (p.fromEnemy) {
+      for (const u of armyUnits) {
+        const d = Math.hypot(u.x - p.x, u.y - p.y);
+        if (d < 6) {
+          u.hp -= p.damage;
+          p.hit = true;
+          break;
+        }
+      }
+    } else {
+      for (const e of battleEnemyUnits) {
+        const d = Math.hypot(e.x - p.x, e.y - p.y);
+        if (d < 6) {
+          e.hp -= p.damage;
+          p.hit = true;
+          break;
+        }
+      }
+    }
+  }
+  projectiles = projectiles.filter(p => !p.hit && Math.abs(p.x) < 1000 && Math.abs(p.y) < 1000);
+
   // cleanup
   armyUnits = armyUnits.filter(u => u.hp > 0);
   battleEnemyUnits = battleEnemyUnits.filter(e => e.hp > 0);
-  // keep destroyed enemy buildings for fire animation
   for (const b of battleEnemyBuildings) {
     if (b.destroyed) b.fireTime += dt;
   }
@@ -751,7 +859,6 @@ function updateBattle(dt) {
     battleEnemyBuildings.some(b => !b.destroyed);
 
   if (!enemyAlive && armyAlive) {
-    // victory: enemy town burning
     battleVictory = true;
   }
 
@@ -768,21 +875,18 @@ function finishBattle(armyAlive, enemyAlive) {
   inBattle = false;
 
   if (armyAlive && !enemyAlive) {
-    // victory: enemy civ on fire + loot + claim some army/buildings
-    const reward = 500 + Math.floor(Math.random() * 500);
+    const reward = 600 + Math.floor(Math.random() * 600);
     coins += reward;
 
-    // claim some enemy as new units
-    const extraUnits = 3 + Math.floor(Math.random() * 3);
+    const extraUnits = 4 + Math.floor(Math.random() * 4);
     const types = ["knight", "archer", "spearman", "mage"];
     for (let i = 0; i < extraUnits; i++) {
       const t = types[Math.floor(Math.random() * types.length)];
       spawnArmyUnitNearPlayer(t);
     }
 
-    // claim some buildings near player
     const buildTypes = ["house", "farm", "market", "tower"];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       const t = buildTypes[Math.floor(Math.random() * buildTypes.length)];
       const tx = Math.floor(player.x / TILE_SIZE) + (i - 1) * 2;
       const ty = Math.floor(player.y / TILE_SIZE) - 3;
@@ -809,7 +913,6 @@ function finishBattle(armyAlive, enemyAlive) {
     people = Math.max(0, Math.floor(people * (1 - lossFactor * 0.5)));
     citizens = citizens.slice(0, people);
 
-    // mark some houses destroyed with fire
     const houses = buildings.filter(b => b.type === "house" && !b.destroyed);
     for (const h of houses) {
       if (Math.random() < 0.5) {
@@ -819,7 +922,6 @@ function finishBattle(armyAlive, enemyAlive) {
     }
   }
 
-  // army returns near player
   for (let i = 0; i < armyUnits.length; i++) {
     armyUnits[i].x = player.x + (Math.random() * 40 - 20);
     armyUnits[i].y = player.y + (Math.random() * 40 - 20);
@@ -845,7 +947,6 @@ function drawGround() {
       ctx.fillStyle = color;
       ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
 
-      // tiny 8-bit details (rocks/flowers)
       const r = randSeeded(tx * 3, ty * 7);
       if (r < 0.02) {
         ctx.fillStyle = "#c0c0c0";
@@ -858,50 +959,109 @@ function drawGround() {
   }
 }
 
+// detailed 8-bit fire (world + battle)
 function drawFireWorld(x, y, t) {
   const s = worldToScreen(x, y);
-  const phase = Math.sin(t * 10);
-  const h = 10 + phase * 2;
+  const flicker = (Math.sin(t * 18) + Math.sin(t * 11)) * 0.5;
+  const baseH = 10;
+  const h = baseH + flicker * 3;
 
-  ctx.fillStyle = "#ffcc33";
-  ctx.fillRect(s.x - 3, s.y - h, 6, h / 2);
-  ctx.fillStyle = "#ff6633";
-  ctx.fillRect(s.x - 2, s.y - h / 2, 4, h / 2);
-  ctx.fillStyle = "#ff0000";
-  ctx.fillRect(s.x - 1, s.y - h / 4, 2, h / 4);
+  // dark base
+  ctx.fillStyle = "#3b1a0a";
+  ctx.fillRect(s.x - 4, s.y - 2, 8, 3);
+
+  // red
+  ctx.fillStyle = "#ff3300";
+  ctx.fillRect(s.x - 3, s.y - h + 4, 6, h - 4);
+
+  // orange
+  ctx.fillStyle = "#ff7b00";
+  ctx.fillRect(s.x - 2, s.y - h + 3, 4, h - 6);
+
+  // yellow
+  ctx.fillStyle = "#ffd800";
+  ctx.fillRect(s.x - 1, s.y - h + 2, 2, h - 8);
+
+  // small sparks
+  if (Math.random() < 0.4) {
+    ctx.fillStyle = "#ffd800";
+    ctx.fillRect(s.x + (Math.random() < 0.5 ? -2 : 2), s.y - h - 2, 1, 2);
+  }
 }
 
 function drawBuildings() {
   for (const b of buildings) {
     const sx = (b.x * TILE_SIZE - camera.x) + width / 2;
     const sy = (b.y * TILE_SIZE - camera.y) + height / 2;
-
     const def = buildingDefs[b.type];
     if (!def) continue;
 
-    // shadow
     ctx.fillStyle = "#00000080";
     ctx.fillRect(sx, sy + TILE_SIZE - 4, TILE_SIZE, 4);
 
     if (!b.destroyed) {
-      // outline
-      ctx.fillStyle = "#000000";
-      ctx.fillRect(sx + 1, sy + 3, TILE_SIZE - 2, TILE_SIZE - 4);
-
-      // body
-      ctx.fillStyle = def.color;
-      ctx.fillRect(sx + 2, sy + 4, TILE_SIZE - 4, TILE_SIZE - 6);
-
-      // door
-      ctx.fillStyle = "#00000080";
-      ctx.fillRect(sx + 4, sy + 6, 4, 4);
-
-      // tiny flag on towers/important
-      if (b.type === "tower" || b.type === "barracks") {
+      if (b.type === "house") {
         ctx.fillStyle = "#000000";
-        ctx.fillRect(sx + TILE_SIZE - 5, sy + 1, 1, 5);
+        ctx.fillRect(sx + 1, sy + 3, TILE_SIZE - 2, TILE_SIZE - 4);
+        ctx.fillStyle = "#f4d28a";
+        ctx.fillRect(sx + 2, sy + 6, TILE_SIZE - 4, TILE_SIZE - 7);
+        ctx.fillStyle = "#b56539";
+        ctx.fillRect(sx + 2, sy + 4, TILE_SIZE - 4, 4);
+        ctx.fillStyle = "#00000080";
+        ctx.fillRect(sx + 5, sy + 9, 4, 6);
+      } else if (b.type === "farm") {
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(sx + 1, sy + 5, TILE_SIZE - 2, TILE_SIZE - 6);
+        ctx.fillStyle = "#7fbf4a";
+        ctx.fillRect(sx + 2, sy + 6, TILE_SIZE - 4, TILE_SIZE - 8);
+        ctx.fillStyle = "#5a3b1a";
+        for (let i = 0; i < 3; i++) {
+          ctx.fillRect(sx + 3 + i * 4, sy + 6, 2, TILE_SIZE - 8);
+        }
+      } else if (b.type === "market") {
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(sx + 1, sy + 3, TILE_SIZE - 2, TILE_SIZE - 4);
+        ctx.fillStyle = "#ffb0b0";
+        ctx.fillRect(sx + 2, sy + 8, TILE_SIZE - 4, TILE_SIZE - 9);
+        ctx.fillStyle = "#ff0000";
+        ctx.fillRect(sx + 2, sy + 4, 4, 4);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(sx + 6, sy + 4, 4, 4);
+        ctx.fillStyle = "#00a0ff";
+        ctx.fillRect(sx + 10, sy + 4, 4, 4);
+      } else if (b.type === "temple") {
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(sx + 1, sy + 3, TILE_SIZE - 2, TILE_SIZE - 4);
+        ctx.fillStyle = "#d8c8ff";
+        ctx.fillRect(sx + 3, sy + 6, TILE_SIZE - 6, TILE_SIZE - 7);
+        ctx.fillStyle = "#f0e8ff";
+        ctx.fillRect(sx + 5, sy + 4, TILE_SIZE - 10, 3);
+        ctx.fillStyle = "#ffd800";
+        ctx.fillRect(sx + 7, sy + 2, 2, 2);
+      } else if (b.type === "barracks") {
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(sx + 1, sy + 5, TILE_SIZE - 2, TILE_SIZE - 6);
+        ctx.fillStyle = "#8b5a2b";
+        ctx.fillRect(sx + 2, sy + 6, TILE_SIZE - 4, TILE_SIZE - 8);
+        ctx.fillStyle = "#5a3b1a";
+        ctx.fillRect(sx + 2, sy + 6, TILE_SIZE - 4, 3);
+      } else if (b.type === "tower") {
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(sx + 4, sy - TILE_SIZE * 2 + 4, TILE_SIZE - 8, TILE_SIZE * 2 + 4);
+        ctx.fillStyle = "#a0b0ff";
+        ctx.fillRect(sx + 5, sy - TILE_SIZE * 2 + 5, TILE_SIZE - 10, TILE_SIZE * 2 + 2);
+        ctx.fillStyle = "#00000080";
+        ctx.fillRect(sx + 7, sy - TILE_SIZE * 2 + 8, 3, 3);
+        ctx.fillRect(sx + 11, sy - TILE_SIZE * 2 + 8, 3, 3);
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(sx + TILE_SIZE - 6, sy - TILE_SIZE * 2 + 2, 1, 6);
         ctx.fillStyle = "#ff4444";
-        ctx.fillRect(sx + TILE_SIZE - 4, sy + 1, 3, 3);
+        ctx.fillRect(sx + TILE_SIZE - 5, sy - TILE_SIZE * 2 + 2, 4, 3);
+      } else {
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(sx + 1, sy + 3, TILE_SIZE - 2, TILE_SIZE - 4);
+        ctx.fillStyle = def.color;
+        ctx.fillRect(sx + 2, sy + 4, TILE_SIZE - 4, TILE_SIZE - 6);
       }
     } else {
       ctx.fillStyle = "#3a1a1a";
@@ -980,7 +1140,7 @@ function drawEnemyBattle() {
     ctx.fillStyle = "#000000";
     ctx.fillRect(s.x - 5, s.y - 9 + bob, 10, 13);
 
-    ctx.fillStyle = "#ff6666";
+    ctx.fillStyle = e.type === "enemy_archer" ? "#ffcc66" : "#ff6666";
     ctx.fillRect(s.x - 4, s.y - 8 + bob, 8, 8);
 
     const ratio = e.hp / e.maxHp;
@@ -994,29 +1154,42 @@ function drawEnemyBattle() {
     const s = worldToScreen(b.x, b.y);
 
     if (!b.destroyed) {
-      ctx.fillStyle = "#000000";
-      ctx.fillRect(s.x - 9, s.y - 13, 18, 14);
-
-      ctx.fillStyle = "#663333";
-      ctx.fillRect(s.x - 8, s.y - 12, 16, 12);
+      if (b.type === "tower") {
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(s.x - 8, s.y - 32, 16, 32);
+        ctx.fillStyle = "#a0b0ff";
+        ctx.fillRect(s.x - 7, s.y - 31, 14, 30);
+        ctx.fillStyle = "#00000080";
+        ctx.fillRect(s.x - 4, s.y - 26, 3, 3);
+        ctx.fillRect(s.x + 1, s.y - 26, 3, 3);
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(s.x + 6, s.y - 34, 1, 6);
+        ctx.fillStyle = "#ff2222";
+        ctx.fillRect(s.x + 7, s.y - 34, 4, 3);
+      } else {
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(s.x - 9, s.y - 13, 18, 14);
+        ctx.fillStyle = "#663333";
+        ctx.fillRect(s.x - 8, s.y - 12, 16, 12);
+      }
 
       ctx.fillStyle = "#000000aa";
       ctx.fillRect(s.x - 8, s.y - 14, 16, 2);
       const ratio = b.hp / b.maxHp;
       ctx.fillStyle = "#ff7f7f";
       ctx.fillRect(s.x - 8, s.y - 14, 16 * ratio, 2);
-
-      // enemy flag
-      ctx.fillStyle = "#000000";
-      ctx.fillRect(s.x + 6, s.y - 16, 1, 6);
-      ctx.fillStyle = "#ff2222";
-      ctx.fillRect(s.x + 7, s.y - 16, 4, 3);
     } else {
-      // burning ruins when destroyed (victory fire)
       ctx.fillStyle = "#3a1a1a";
       ctx.fillRect(s.x - 8, s.y - 4, 16, 4);
       drawFireWorld(b.x, b.y, b.fireTime);
     }
+  }
+
+  // draw projectiles (arrows)
+  for (const p of projectiles) {
+    const s = worldToScreen(p.x, p.y);
+    ctx.fillStyle = p.fromEnemy ? "#ffddaa" : "#ffffff";
+    ctx.fillRect(s.x - 1, s.y - 1, 3, 2);
   }
 }
 
@@ -1100,4 +1273,3 @@ function loop(now) {
 }
 
 requestAnimationFrame(loop);
-
