@@ -1,0 +1,31 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tiny Planet Builder</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="ui">
+    <div id="title">Tiny Planet Builder</div>
+    <div id="info">
+      Left click: place building · Right click: remove building · Mouse wheel: zoom · Drag: rotate planet
+    </div>
+    <div id="toolbar">
+      <button data-type="house" class="tool selected">House</button>
+      <button data-type="tree" class="tool">Tree</button>
+      <button data-type="farm" class="tool">Farm</button>
+      <button data-type="tower" class="tool">Tower</button>
+      <button data-type="clear" id="clearBtn">Clear Planet</button>
+    </div>
+    <div id="stats">
+      <span id="popStat">Population: 0</span>
+      <span id="happinessStat">Happiness: 100</span>
+    </div>
+  </div>
+  <canvas id="game"></canvas>
+
+  <script src="main.js"></script>
+</body>
+</html>
