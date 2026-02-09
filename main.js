@@ -11,92 +11,80 @@ const statsEl = document.getElementById("stats");
 const dialogEl = document.getElementById("dialog");
 
 const keys = {};
-let mouse = { x: 0, y: 0, down: false };
+let mouse = { x: 0, y: 0, tileX: 0, tileY: 0, down: false };
 
-const planet = {
-  radius: 220,
-  colorInner: "#2b4f9f",
-  colorOuter: "#1a2b5f"
-};
+const TILE_SIZE = 16; // 8-bit style
+const WORLD_SEED = 12345;
 
 const player = {
   x: 0,
-  y: -planet.radius + 20,
-  r: 10,
-  speed: 140,
-  hp: 100,
-  maxHp: 100,
-  attackCooldown: 0,
-  attackRate: 0.4,
-  facing: 0
+  y: 0,
+  speed: 80,
+  w: 12,
+  h: 14,
+  facing: "down"
 };
 
-const villagers = [];
-const monsters = [];
-const projectiles = [];
+let camera = { x: 0, y: 0 };
+
+let coins = 200;
+let people = 3;
+let buildings = []; // {x,y,type}
+let citizens = [];  // {x,y,homeId,dialogCooldown}
+let selectedBuild = "house"; // house, farm, market, hire
+let warMode = false;
+
+const buildingDefs = {
+  house: { name: "House", cost: 50, color: "#ffdd77", income: 1, pop: 2 },
+  farm: { name: "Farm", cost: 80, color: "#88c96b", income: 3, pop: 0 },
+  market: { name: "Market", cost: 150, color: "#ff8f8f", income: 6, pop: 0 }
+};
 
 const dialogLines = [
-  "Welcome to our tiny world.",
-  "The monsters keep crawling up from the dark side...",
-  "If you protect us, we'll remember you.",
-  "Sometimes I just stare into the sky and think.",
-  "This planet is small, but it's home."
+  "This land feels endless, doesn't it?",
+  "We work, we build, we grow.",
+  "Coins aren't everything... but they help.",
+  "One day, our people will be countless.",
+  "I heard rumors of war if we grow too big..."
 ];
 
-function randRange(a, b) {
-  return a + Math.random() * (b - a);
+function randSeeded(x, y) {
+  let n = x * 374761393 + y * 668265263 + WORLD_SEED * 1446647;
+  n = (n ^ (n >> 13)) * 1274126177;
+  n = (n ^ (n >> 16));
+  return (n >>> 0) / 4294967295;
 }
 
-function spawnVillagers() {
-  villagers.length = 0;
-  for (let i = 0; i < 6; i++) {
-    const angle = (i / 6) * Math.PI * 2 + randRange(-0.2, 0.2);
-    const x = Math.cos(angle) * (planet.radius - 18);
-    const y = Math.sin(angle) * (planet.radius - 18);
-    villagers.push({
-      x,
-      y,
-      r: 8,
-      angle,
-      talkCooldown: 0
-    });
-  }
+function tileKey(tx, ty) {
+  return `${tx},${ty}`;
 }
 
-function spawnMonsters() {
-  monsters.length = 0;
-  for (let i = 0; i < 10; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const x = Math.cos(angle) * (planet.radius + 40);
-    const y = Math.sin(angle) * (planet.radius + 40);
-    monsters.push({
-      x,
-      y,
-      r: 9,
-      hp: 30,
-      maxHp: 30,
-      angle,
-      speed: 40 + Math.random() * 30
-    });
-  }
+function getGroundColor(tx, ty) {
+  const r = randSeeded(tx, ty);
+  if (r < 0.05) return "#3b5b2a";
+  if (r < 0.1) return "#2f4b22";
+  return "#26401c";
 }
 
-function resetGame() {
-  player.x = 0;
-  player.y = -planet.radius + 20;
-  player.hp = player.maxHp;
-  projectiles.length = 0;
-  spawnVillagers();
-  spawnMonsters();
-  dialogEl.textContent = "You wake up on a tiny planet surrounded by people who need you.";
+function worldToScreen(x, y) {
+  return {
+    x: Math.floor((x - camera.x) + width / 2),
+    y: Math.floor((y - camera.y) + height / 2)
+  };
 }
-resetGame();
 
-function updateStats() {
-  const aliveMonsters = monsters.filter(m => m.hp > 0).length;
-  statsEl.textContent = `HP: ${Math.round(player.hp)} / ${player.maxHp} · Monsters: ${aliveMonsters}`;
+function screenToWorld(x, y) {
+  return {
+    x: (x - width / 2) + camera.x,
+    y: (y - height / 2) + camera.y
+  };
 }
-updateStats();
+
+function updateMouseTile() {
+  const w = screenToWorld(mouse.x, mouse.y);
+  mouse.tileX = Math.floor(w.x / TILE_SIZE);
+  mouse.tileY = Math.floor(w.y / TILE_SIZE);
+}
 
 window.addEventListener("resize", () => {
   width = window.innerWidth;
@@ -106,11 +94,18 @@ window.addEventListener("resize", () => {
 });
 
 window.addEventListener("keydown", e => {
-  keys[e.key.toLowerCase()] = true;
-  if (e.key.toLowerCase() === "r") {
-    resetGame();
+  const k = e.key.toLowerCase();
+  keys[k] = true;
+
+  if (k === "1") selectedBuild = "house";
+  if (k === "2") selectedBuild = "farm";
+  if (k === "3") selectedBuild = "market";
+  if (k === "4") selectedBuild = "hire";
+  if (k === "r") {
+    camera.x = player.x;
+    camera.y = player.y;
   }
-  if (e.key.toLowerCase() === "e") {
+  if (k === "e") {
     tryTalk();
   }
 });
@@ -123,12 +118,13 @@ canvas.addEventListener("mousemove", e => {
   const rect = canvas.getBoundingClientRect();
   mouse.x = e.clientX - rect.left;
   mouse.y = e.clientY - rect.top;
+  updateMouseTile();
 });
 
 canvas.addEventListener("mousedown", e => {
   if (e.button === 0) {
     mouse.down = true;
-    tryAttack();
+    handleClick();
   }
 });
 
@@ -138,17 +134,104 @@ canvas.addEventListener("mouseup", e => {
 
 canvas.addEventListener("contextmenu", e => e.preventDefault());
 
-function length(x, y) {
-  return Math.sqrt(x * x + y * y);
+function handleClick() {
+  if (selectedBuild === "hire") {
+    tryHire();
+  } else {
+    tryBuild();
+  }
 }
 
-function normalize(x, y) {
-  const l = length(x, y) || 1;
-  return { x: x / l, y: y / l };
+function tryBuild() {
+  const tx = mouse.tileX;
+  const ty = mouse.tileY;
+
+  if (buildings.some(b => b.x === tx && b.y === ty)) {
+    dialogEl.textContent = "There's already something here.";
+    return;
+  }
+
+  const def = buildingDefs[selectedBuild];
+  if (!def) return;
+
+  if (coins < def.cost) {
+    dialogEl.textContent = "Not enough coins.";
+    return;
+  }
+
+  coins -= def.cost;
+  buildings.push({ x: tx, y: ty, type: selectedBuild });
+
+  if (def.pop > 0) {
+    for (let i = 0; i < def.pop; i++) {
+      spawnCitizenNear(tx, ty, buildings.length - 1);
+    }
+  }
+
+  dialogEl.textContent = `Built a ${def.name}.`;
 }
 
-function clamp(v, a, b) {
-  return v < a ? a : v > b ? b : v;
+function spawnCitizenNear(tx, ty, homeId) {
+  const px = (tx + 0.5 + (Math.random() * 0.4 - 0.2)) * TILE_SIZE;
+  const py = (ty + 0.5 + (Math.random() * 0.4 - 0.2)) * TILE_SIZE;
+  citizens.push({
+    x: px,
+    y: py,
+    homeId,
+    dialogCooldown: 0,
+    wanderDir: Math.random() * Math.PI * 2
+  });
+  people++;
+}
+
+function tryHire() {
+  const tx = mouse.tileX;
+  const ty = mouse.tileY;
+
+  const nearHouse = buildings.findIndex(
+    b => b.type === "house" && Math.abs(b.x - tx) <= 1 && Math.abs(b.y - ty) <= 1
+  );
+
+  if (nearHouse === -1) {
+    dialogEl.textContent = "You must be near a house to hire.";
+    return;
+  }
+
+  const cost = 30;
+  if (coins < cost) {
+    dialogEl.textContent = "Not enough coins to hire.";
+    return;
+  }
+
+  coins -= cost;
+  spawnCitizenNear(buildings[nearHouse].x, buildings[nearHouse].y, nearHouse);
+  dialogEl.textContent = "You hired a new person.";
+}
+
+function tryTalk() {
+  let closest = null;
+  let closestDist = 24;
+
+  for (const c of citizens) {
+    const dx = c.x - player.x;
+    const dy = c.y - player.y;
+    const d = Math.hypot(dx, dy);
+    if (d < closestDist) {
+      closestDist = d;
+      closest = c;
+    }
+  }
+
+  if (!closest) {
+    dialogEl.textContent = "No one is close enough to talk.";
+    return;
+  }
+
+  if (closest.dialogCooldown > 0) return;
+
+  closest.dialogCooldown = 2;
+  const line = dialogLines[Math.floor(Math.random() * dialogLines.length)];
+  dialogEl.textContent = line;
 }
 
 function updatePlayer(dt) {
@@ -160,306 +243,184 @@ function updatePlayer(dt) {
   if (keys["d"]) mx += 1;
 
   if (mx !== 0 || my !== 0) {
-    const n = normalize(mx, my);
-    player.x += n.x * player.speed * dt;
-    player.y += n.y * player.speed * dt;
-  }
+    const len = Math.hypot(mx, my) || 1;
+    mx /= len;
+    my /= len;
+    player.x += mx * player.speed * dt;
+    player.y += my * player.speed * dt;
 
-  const dist = length(player.x, player.y);
-  const maxDist = planet.radius - 10;
-  if (dist > maxDist) {
-    const n = normalize(player.x, player.y);
-    player.x = n.x * maxDist;
-    player.y = n.y * maxDist;
-  }
-
-  const cx = width / 2;
-  const cy = height / 2;
-  const wx = player.x + cx;
-  const wy = player.y + cy;
-  const dx = mouse.x - wx;
-  const dy = mouse.y - wy;
-  player.facing = Math.atan2(dy, dx);
-
-  player.attackCooldown = Math.max(0, player.attackCooldown - dt);
-
-  if (mouse.down) {
-    tryAttack();
-  }
-
-  if (player.hp <= 0) {
-    dialogEl.textContent = "You fell... Press R to wake up again.";
-  }
-}
-
-function tryAttack() {
-  if (player.attackCooldown > 0 || player.hp <= 0) return;
-  player.attackCooldown = player.attackRate;
-
-  const speed = 260;
-  const dir = { x: Math.cos(player.facing), y: Math.sin(player.facing) };
-  projectiles.push({
-    x: player.x,
-    y: player.y,
-    vx: dir.x * speed,
-    vy: dir.y * speed,
-    life: 0.8,
-    r: 4
-  });
-}
-
-function tryTalk() {
-  let closest = null;
-  let closestDist = 40;
-  for (const v of villagers) {
-    const d = length(v.x - player.x, v.y - player.y);
-    if (d < closestDist) {
-      closestDist = d;
-      closest = v;
+    if (Math.abs(mx) > Math.abs(my)) {
+      player.facing = mx > 0 ? "right" : "left";
+    } else {
+      player.facing = my > 0 ? "down" : "up";
     }
   }
-  if (!closest) {
-    dialogEl.textContent = "No one is close enough to hear you.";
-    return;
-  }
 
-  if (closest.talkCooldown > 0) return;
-
-  closest.talkCooldown = 2;
-  const line = dialogLines[Math.floor(Math.random() * dialogLines.length)];
-  dialogEl.textContent = line;
+  camera.x += (player.x - camera.x) * 0.15;
+  camera.y += (player.y - camera.y) * 0.15;
 }
 
-function updateVillagers(dt) {
-  for (const v of villagers) {
-    v.talkCooldown = Math.max(0, v.talkCooldown - dt);
-  }
-}
+function updateCitizens(dt) {
+  for (const c of citizens) {
+    c.dialogCooldown = Math.max(0, c.dialogCooldown - dt);
 
-function updateMonsters(dt) {
-  for (const m of monsters) {
-    if (m.hp <= 0) continue;
-
-    const dx = player.x - m.x;
-    const dy = player.y - m.y;
-    const n = normalize(dx, dy);
-    m.x += n.x * m.speed * dt;
-    m.y += n.y * m.speed * dt;
-
-    const dist = length(m.x, m.y);
-    const minDist = planet.radius - 5;
-    if (dist < minDist) {
-      const nn = normalize(m.x, m.y);
-      m.x = nn.x * minDist;
-      m.y = nn.y * minDist;
+    if (Math.random() < 0.01) {
+      c.wanderDir += (Math.random() - 0.5) * 0.8;
     }
 
-    const dToPlayer = length(m.x - player.x, m.y - player.y);
-    if (dToPlayer < m.r + player.r + 2 && player.hp > 0) {
-      player.hp -= 20 * dt;
-      player.hp = clamp(player.hp, 0, player.maxHp);
-      if (player.hp <= 0) {
-        player.hp = 0;
+    const speed = 20;
+    c.x += Math.cos(c.wanderDir) * speed * dt;
+    c.y += Math.sin(c.wanderDir) * speed * dt;
+
+    const home = buildings[c.homeId];
+    if (home) {
+      const hx = (home.x + 0.5) * TILE_SIZE;
+      const hy = (home.y + 0.5) * TILE_SIZE;
+      const dx = c.x - hx;
+      const dy = c.y - hy;
+      const d = Math.hypot(dx, dy);
+      if (d > 40) {
+        c.x -= dx * 0.1;
+        c.y -= dy * 0.1;
       }
     }
   }
 }
 
-function updateProjectiles(dt) {
-  for (let i = projectiles.length - 1; i >= 0; i--) {
-    const p = projectiles[i];
-    p.x += p.vx * dt;
-    p.y += p.vy * dt;
-    p.life -= dt;
-    if (p.life <= 0) {
-      projectiles.splice(i, 1);
-      continue;
+let incomeTimer = 0;
+function updateEconomy(dt) {
+  incomeTimer += dt;
+  if (incomeTimer >= 1) {
+    incomeTimer = 0;
+    let income = 0;
+    for (const b of buildings) {
+      const def = buildingDefs[b.type];
+      if (def) income += def.income;
     }
+    income += Math.floor(people / 10);
+    coins += income;
+  }
 
-    for (const m of monsters) {
-      if (m.hp <= 0) continue;
-      const d = length(p.x - m.x, p.y - m.y);
-      if (d < m.r + p.r) {
-        m.hp -= 20;
-        projectiles.splice(i, 1);
-        break;
-      }
+  if (!warMode && people >= 10000) {
+    warMode = true;
+    dialogEl.textContent = "Your civilization is huge. Whispers of war begin...";
+  }
+}
+
+function drawGround() {
+  const startX = Math.floor((camera.x - width / 2) / TILE_SIZE) - 1;
+  const endX = Math.floor((camera.x + width / 2) / TILE_SIZE) + 1;
+  const startY = Math.floor((camera.y - height / 2) / TILE_SIZE) - 1;
+  const endY = Math.floor((camera.y + height / 2) / TILE_SIZE) + 1;
+
+  for (let ty = startY; ty <= endY; ty++) {
+    for (let tx = startX; tx <= endX; tx++) {
+      const color = getGroundColor(tx, ty);
+      const sx = Math.floor((tx * TILE_SIZE - camera.x) + width / 2);
+      const sy = Math.floor((ty * TILE_SIZE - camera.y) + height / 2);
+      ctx.fillStyle = color;
+      ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
     }
   }
 }
 
-function drawBackground() {
-  const grad = ctx.createLinearGradient(0, 0, 0, height);
-  grad.addColorStop(0, "#050816");
-  grad.addColorStop(1, "#0b1630");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, width, height);
+function drawBuildings() {
+  for (const b of buildings) {
+    const sx = (b.x * TILE_SIZE - camera.x) + width / 2;
+    const sy = (b.y * TILE_SIZE - camera.y) + height / 2;
 
-  ctx.fillStyle = "rgba(255,255,255,0.8)";
-  for (let i = 0; i < 80; i++) {
-    const x = (i * 73) % width;
-    const y = ((i * 139) % height) * 0.6;
-    const r = (i % 3 === 0) ? 1.5 : 1;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
+    const def = buildingDefs[b.type];
+    if (!def) continue;
+
+    ctx.fillStyle = "#00000080";
+    ctx.fillRect(sx, sy + TILE_SIZE - 4, TILE_SIZE, 4);
+
+    ctx.fillStyle = def.color;
+    ctx.fillRect(sx + 2, sy + 4, TILE_SIZE - 4, TILE_SIZE - 6);
+
+    ctx.fillStyle = "#00000080";
+    ctx.fillRect(sx + 4, sy + 6, 4, 4);
   }
 }
 
-function drawPlanet() {
-  const cx = width / 2;
-  const cy = height / 2;
+function drawCitizens() {
+  for (const c of citizens) {
+    const s = worldToScreen(c.x, c.y);
 
-  ctx.save();
-  ctx.translate(cx, cy);
-
-  const grad = ctx.createRadialGradient(
-    0, 0, planet.radius * 0.2,
-    0, 0, planet.radius
-  );
-  grad.addColorStop(0, planet.colorInner);
-  grad.addColorStop(1, planet.colorOuter);
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.arc(0, 0, planet.radius, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.strokeStyle = "rgba(0,0,0,0.25)";
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  for (let i = 0; i < 64; i++) {
-    const a = (i / 64) * Math.PI * 2;
-    const x = Math.cos(a) * planet.radius;
-    const y = Math.sin(a) * planet.radius;
-    ctx.moveTo(x, y);
-    ctx.lineTo(x * 1.02, y * 1.02);
-  }
-  ctx.stroke();
-
-  ctx.restore();
-}
-
-function drawVillagers() {
-  const cx = width / 2;
-  const cy = height / 2;
-
-  for (const v of villagers) {
-    ctx.save();
-    ctx.translate(cx + v.x, cy + v.y);
-
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
-    ctx.beginPath();
-    ctx.ellipse(0, 8, 8, 4, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle = "#00000080";
+    ctx.fillRect(s.x - 4, s.y + 4, 8, 3);
 
     ctx.fillStyle = "#ffe0a8";
-    ctx.beginPath();
-    ctx.arc(0, -4, v.r, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillRect(s.x - 3, s.y - 6, 6, 6);
 
-    ctx.fillStyle = "#4f9cff";
-    ctx.fillRect(-v.r + 1, -2, v.r * 2 - 2, 8);
-
-    ctx.restore();
-  }
-}
-
-function drawMonsters() {
-  const cx = width / 2;
-  const cy = height / 2;
-
-  for (const m of monsters) {
-    if (m.hp <= 0) continue;
-
-    ctx.save();
-    ctx.translate(cx + m.x, cy + m.y);
-
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
-    ctx.beginPath();
-    ctx.ellipse(0, 8, 9, 4, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = "#ff4f6a";
-    ctx.beginPath();
-    ctx.arc(0, -2, m.r, 0, Math.PI * 2);
-    ctx.fill();
-
-    const hpRatio = m.hp / m.maxHp;
-    ctx.fillStyle = "#000000aa";
-    ctx.fillRect(-10, -18, 20, 3);
-    ctx.fillStyle = "#ff6f7f";
-    ctx.fillRect(-10, -18, 20 * hpRatio, 3);
-
-    ctx.restore();
-  }
-}
-
-function drawProjectiles() {
-  const cx = width / 2;
-  const cy = height / 2;
-
-  ctx.fillStyle = "#ffd27f";
-  for (const p of projectiles) {
-    ctx.beginPath();
-    ctx.arc(cx + p.x, cy + p.y, p.r, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle = "#4fa8ff";
+    ctx.fillRect(s.x - 3, s.y, 6, 6);
   }
 }
 
 function drawPlayer() {
-  const cx = width / 2;
-  const cy = height / 2;
+  const s = worldToScreen(player.x, player.y);
 
-  ctx.save();
-  ctx.translate(cx + player.x, cy + player.y);
+  ctx.fillStyle = "#00000080";
+  ctx.fillRect(s.x - 6, s.y + 6, 12, 4);
 
-  ctx.fillStyle = "rgba(0,0,0,0.35)";
-  ctx.beginPath();
-  ctx.ellipse(0, 10, 10, 5, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.fillStyle = "#ffe0a8";
+  ctx.fillRect(s.x - 5, s.y - 10, 10, 8);
 
-  ctx.rotate(player.facing);
+  ctx.fillStyle = "#ffddff";
+  ctx.fillRect(s.x - 5, s.y - 2, 10, 10);
 
-  ctx.fillStyle = "#ffd27f";
-  ctx.beginPath();
-  ctx.arc(0, -6, player.r, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = "#7fe2ff";
-  ctx.fillRect(-player.r + 2, -2, player.r * 2 - 4, 10);
-
-  ctx.fillStyle = "#ffd27f";
-  ctx.fillRect(4, -2, 8, 3);
-
-  ctx.restore();
-
-  const hpRatio = player.hp / player.maxHp;
-  ctx.fillStyle = "#000000aa";
-  ctx.fillRect(cx - 40, cy + planet.radius + 20, 80, 6);
-  ctx.fillStyle = "#7fff7f";
-  ctx.fillRect(cx - 40, cy + planet.radius + 20, 80 * hpRatio, 6);
+  ctx.fillStyle = "#000000";
+  if (player.facing === "up") {
+    ctx.fillRect(s.x - 3, s.y - 8, 2, 2);
+    ctx.fillRect(s.x + 1, s.y - 8, 2, 2);
+  } else if (player.facing === "down") {
+    ctx.fillRect(s.x - 3, s.y - 6, 2, 2);
+    ctx.fillRect(s.x + 1, s.y - 6, 2, 2);
+  } else if (player.facing === "left") {
+    ctx.fillRect(s.x - 4, s.y - 7, 2, 2);
+  } else if (player.facing === "right") {
+    ctx.fillRect(s.x + 2, s.y - 7, 2, 2);
+  }
 }
 
-let lastTime = performance.now();
+function drawCursor() {
+  const tx = mouse.tileX;
+  const ty = mouse.tileY;
+  const sx = (tx * TILE_SIZE - camera.x) + width / 2;
+  const sy = (ty * TILE_SIZE - camera.y) + height / 2;
+
+  ctx.strokeStyle = "#ffff88";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(sx + 0.5, sy + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+}
+
+function updateStats() {
+  statsEl.textContent =
+    `Coins: ${Math.floor(coins)} · People: ${people} · Buildings: ${buildings.length} · Mode: ${selectedBuild.toUpperCase()}${warMode ? " · WAR RISK" : ""}`;
+}
+
 function loop(now) {
   const dt = Math.min(0.05, (now - lastTime) / 1000);
   lastTime = now;
 
   updatePlayer(dt);
-  updateVillagers(dt);
-  updateMonsters(dt);
-  updateProjectiles(dt);
+  updateCitizens(dt);
+  updateEconomy(dt);
   updateStats();
 
+  ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, width, height);
-  drawBackground();
-  drawPlanet();
-  drawVillagers();
-  drawMonsters();
-  drawProjectiles();
+
+  drawGround();
+  drawBuildings();
+  drawCitizens();
   drawPlayer();
+  drawCursor();
 
   requestAnimationFrame(loop);
 }
+
+let lastTime = performance.now();
 requestAnimationFrame(loop);
 
