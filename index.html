@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Tiny Civilization – Armies & Shop</title>
+  <title>Tiny Civilization – Battle Edition</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -10,7 +10,10 @@
 
   <div id="ui-left">
     <div id="shop-title">SHOP</div>
-    <div id="shop-coins">Coins: 0</div>
+    <div id="shop-coins">
+      <span class="coin-icon"></span>
+      <span id="shop-coins-text">0</span>
+    </div>
     <div id="shop-list">
       <!-- Buildings -->
       <button class="shop-item" data-type="house">House (50c)</button>
@@ -25,7 +28,7 @@
       <div class="shop-section-label">Army Units</div>
       <button class="shop-item" data-type="knight">Knight (120c)</button>
       <button class="shop-item" data-type="archer">Archer (100c)</button>
-      <button classclass="shop-item" data-type="mage">Mage (160c)</button>
+      <button class="shop-item" data-type="mage">Mage (160c)</button>
       <button class="shop-item" data-type="spearman">Spearman (90c)</button>
 
       <!-- Upgrades -->
@@ -49,11 +52,11 @@
   </div>
 
   <div id="ui-top">
-    <div id="title">Tiny Civilization – Armies & War</div>
+    <div id="title">Tiny Civilization – Battle Edition</div>
     <div id="help">
       WASD = move · Mouse = select tile · Left click = build/place<br />
       1–3 = building mode · 4 = hire near house · E = talk · R = center camera<br />
-      Army control: Hold SHIFT + click on ground to set army rally point.
+      Army: Hold SHIFT + click on ground to set rally point · Click raid to invade.
     </div>
     <div id="stats"></div>
     <div id="dialog"></div>
