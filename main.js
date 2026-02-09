@@ -1,3 +1,4 @@
+// main.js
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
@@ -41,9 +42,10 @@ let globalTime = 0;
 
 // battle state
 let inBattle = false;
-let battleEnemyUnits = [];
-let battleEnemyBuildings = [];
+let battleEnemyUnits = [];      // enemy army
+let battleEnemyBuildings = [];  // enemy town
 let battleResultTimer = 0;
+let battleVictory = false;
 
 const buildingDefs = {
   house: { name: "House", cost: 50, color: "#ffdd77", income: 1, pop: 2 },
@@ -88,8 +90,9 @@ function randSeeded(x, y) {
 
 function getGroundColor(tx, ty) {
   const r = randSeeded(tx, ty);
-  if (r < 0.05) return "#3b5b2a";
-  if (r < 0.1) return "#2f4b22";
+  if (r < 0.03) return "#3b5b2a";
+  if (r < 0.06) return "#2f4b22";
+  if (r < 0.09) return "#314522";
   return "#26401c";
 }
 
@@ -155,7 +158,8 @@ canvas.addEventListener("mousemove", e => {
 canvas.addEventListener("mousedown", e => {
   if (e.button === 0) {
     mouse.down = true;
-    if (mouse.shift && !inBattle) {
+    if (mouse.shift) {
+      // rally works both in world and in battle
       setArmyRally();
     } else if (!inBattle) {
       handleClick();
@@ -545,6 +549,7 @@ function startRaid(diff) {
   inBattle = true;
   battleEnemyUnits = [];
   battleEnemyBuildings = [];
+  battleVictory = false;
 
   let enemyCount, enemyHp, enemyAtk, buildingCount;
   if (diff === "easy") {
@@ -581,7 +586,9 @@ function startRaid(diff) {
       x: 260 + (i % 4) * 20,
       y: -40 + Math.floor(i / 4) * 24,
       hp: 60,
-      maxHp: 60
+      maxHp: 60,
+      destroyed: false,
+      fireTime: 0
     });
   }
 
@@ -603,34 +610,72 @@ function updateBattle(dt) {
     e.animTime += dt * 6;
   }
 
-  // army moves toward enemy line
-  for (const u of armyUnits) {
-    const targetX = 0;
-    const dx = targetX - u.x;
-    const d = Math.abs(dx);
-    if (d > 4) {
-      let speed = 40;
-      if (upgrades.training) speed += 20;
-      const dir = dx > 0 ? 1 : -1;
-      u.x += dir * speed * dt;
+  // army movement: rally if set, otherwise advance toward enemy center
+  let armyTarget = null;
+  if (armyRally) {
+    armyTarget = { x: armyRally.x, y: armyRally.y };
+  } else if (battleEnemyUnits.length > 0) {
+    let sumX = 0, sumY = 0;
+    for (const e of battleEnemyUnits) {
+      sumX += e.x;
+      sumY += e.y;
+    }
+    armyTarget = { x: sumX / battleEnemyUnits.length, y: sumY / battleEnemyUnits.length };
+  } else if (battleEnemyBuildings.length > 0) {
+    let sumX = 0, sumY = 0;
+    for (const b of battleEnemyBuildings) {
+      sumX += b.x;
+      sumY += b.y;
+    }
+    armyTarget = { x: sumX / battleEnemyBuildings.length, y: sumY / battleEnemyBuildings.length };
+  }
+
+  if (armyTarget) {
+    for (const u of armyUnits) {
+      const dx = armyTarget.x - u.x;
+      const dy = armyTarget.y - u.y;
+      const d = Math.hypot(dx, dy);
+      if (d > 4) {
+        let speed = 40;
+        if (upgrades.training) speed += 20;
+        const nx = dx / d;
+        const ny = dy / d;
+        u.x += nx * speed * dt;
+        u.y += ny * speed * dt;
+      }
     }
   }
 
-  // enemy moves toward center
+  // enemy movement: chase nearest player unit
   for (const e of battleEnemyUnits) {
-    const targetX = 0;
-    const dx = targetX - e.x;
-    const d = Math.abs(dx);
-    if (d > 4) {
-      const dir = dx > 0 ? 1 : -1;
-      e.x += dir * 30 * dt;
+    let target = null;
+    let bestDist = Infinity;
+    for (const u of armyUnits) {
+      const dx = u.x - e.x;
+      const dy = u.y - e.y;
+      const d = Math.hypot(dx, dy);
+      if (d < bestDist) {
+        bestDist = d;
+        target = u;
+      }
+    }
+    if (target) {
+      const dx = target.x - e.x;
+      const dy = target.y - e.y;
+      const d = Math.hypot(dx, dy);
+      if (d > 4) {
+        const nx = dx / d;
+        const ny = dy / d;
+        e.x += nx * 30 * dt;
+        e.y += ny * 30 * dt;
+      }
     }
   }
 
   separateUnits(armyUnits, 12, dt);
   separateUnits(battleEnemyUnits, 12, dt);
 
-  // combat
+  // combat: army vs enemy
   for (const u of armyUnits) {
     const def = armyDefs[u.type];
     if (!def) continue;
@@ -653,6 +698,7 @@ function updateBattle(dt) {
     }
   }
 
+  // enemy vs army
   for (const e of battleEnemyUnits) {
     if (e.hp <= 0) continue;
     let best = null;
@@ -683,6 +729,10 @@ function updateBattle(dt) {
       if (d <= def.range + 10) {
         const siegeBonus = u.type === "siege" ? 2 : 1;
         b.hp -= (def.atk * siegeBonus) * dt;
+        if (b.hp <= 0) {
+          b.hp = 0;
+          b.destroyed = true;
+        }
       }
     }
   }
@@ -690,14 +740,24 @@ function updateBattle(dt) {
   // cleanup
   armyUnits = armyUnits.filter(u => u.hp > 0);
   battleEnemyUnits = battleEnemyUnits.filter(e => e.hp > 0);
-  battleEnemyBuildings = battleEnemyBuildings.filter(b => b.hp > 0);
+  // keep destroyed enemy buildings for fire animation
+  for (const b of battleEnemyBuildings) {
+    if (b.destroyed) b.fireTime += dt;
+  }
 
   const armyAlive = armyUnits.length > 0;
-  const enemyAlive = battleEnemyUnits.length > 0 || battleEnemyBuildings.length > 0;
+  const enemyAlive =
+    battleEnemyUnits.length > 0 ||
+    battleEnemyBuildings.some(b => !b.destroyed);
+
+  if (!enemyAlive && armyAlive) {
+    // victory: enemy town burning
+    battleVictory = true;
+  }
 
   if (!armyAlive || !enemyAlive) {
     battleResultTimer += dt;
-    if (battleResultTimer > 1) {
+    if (battleResultTimer > 1.5) {
       finishBattle(armyAlive, enemyAlive);
       battleResultTimer = 0;
     }
@@ -708,9 +768,40 @@ function finishBattle(armyAlive, enemyAlive) {
   inBattle = false;
 
   if (armyAlive && !enemyAlive) {
-    const reward = 400 + Math.floor(Math.random() * 400);
+    // victory: enemy civ on fire + loot + claim some army/buildings
+    const reward = 500 + Math.floor(Math.random() * 500);
     coins += reward;
-    dialogEl.textContent = `Victory! Your army returns with ${reward} coins.`;
+
+    // claim some enemy as new units
+    const extraUnits = 3 + Math.floor(Math.random() * 3);
+    const types = ["knight", "archer", "spearman", "mage"];
+    for (let i = 0; i < extraUnits; i++) {
+      const t = types[Math.floor(Math.random() * types.length)];
+      spawnArmyUnitNearPlayer(t);
+    }
+
+    // claim some buildings near player
+    const buildTypes = ["house", "farm", "market", "tower"];
+    for (let i = 0; i < 3; i++) {
+      const t = buildTypes[Math.floor(Math.random() * buildTypes.length)];
+      const tx = Math.floor(player.x / TILE_SIZE) + (i - 1) * 2;
+      const ty = Math.floor(player.y / TILE_SIZE) - 3;
+      buildings.push({
+        x: tx,
+        y: ty,
+        type: t,
+        destroyed: false,
+        fireTime: 0
+      });
+      const def = buildingDefs[t];
+      if (def && def.pop > 0) {
+        for (let j = 0; j < def.pop; j++) {
+          spawnCitizenNear(tx, ty, buildings.length - 1);
+        }
+      }
+    }
+
+    dialogEl.textContent = `Victory! Their town burns and you claim ${reward} coins and some of their strength.`;
   } else {
     dialogEl.textContent = "Defeat... Your lands burn as you return.";
     const lossFactor = 0.5;
@@ -753,11 +844,21 @@ function drawGround() {
       const sy = Math.floor((ty * TILE_SIZE - camera.y) + height / 2);
       ctx.fillStyle = color;
       ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+
+      // tiny 8-bit details (rocks/flowers)
+      const r = randSeeded(tx * 3, ty * 7);
+      if (r < 0.02) {
+        ctx.fillStyle = "#c0c0c0";
+        ctx.fillRect(sx + 5, sy + 9, 2, 2);
+      } else if (r < 0.03) {
+        ctx.fillStyle = "#ff6fb0";
+        ctx.fillRect(sx + 3, sy + 5, 2, 2);
+      }
     }
   }
 }
 
-function drawFire(x, y, t) {
+function drawFireWorld(x, y, t) {
   const s = worldToScreen(x, y);
   const phase = Math.sin(t * 10);
   const h = 10 + phase * 2;
@@ -778,20 +879,35 @@ function drawBuildings() {
     const def = buildingDefs[b.type];
     if (!def) continue;
 
+    // shadow
     ctx.fillStyle = "#00000080";
     ctx.fillRect(sx, sy + TILE_SIZE - 4, TILE_SIZE, 4);
 
     if (!b.destroyed) {
+      // outline
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(sx + 1, sy + 3, TILE_SIZE - 2, TILE_SIZE - 4);
+
+      // body
       ctx.fillStyle = def.color;
       ctx.fillRect(sx + 2, sy + 4, TILE_SIZE - 4, TILE_SIZE - 6);
 
+      // door
       ctx.fillStyle = "#00000080";
       ctx.fillRect(sx + 4, sy + 6, 4, 4);
+
+      // tiny flag on towers/important
+      if (b.type === "tower" || b.type === "barracks") {
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(sx + TILE_SIZE - 5, sy + 1, 1, 5);
+        ctx.fillStyle = "#ff4444";
+        ctx.fillRect(sx + TILE_SIZE - 4, sy + 1, 3, 3);
+      }
     } else {
       ctx.fillStyle = "#3a1a1a";
       ctx.fillRect(sx + 2, sy + 8, TILE_SIZE - 4, 4);
       b.fireTime += 0.016;
-      drawFire((b.x + 0.5) * TILE_SIZE, (b.y + 0.5) * TILE_SIZE, b.fireTime);
+      drawFireWorld((b.x + 0.5) * TILE_SIZE, (b.y + 0.5) * TILE_SIZE, b.fireTime);
     }
   }
 }
@@ -803,6 +919,9 @@ function drawCitizens() {
 
     ctx.fillStyle = "#00000080";
     ctx.fillRect(s.x - 4, s.y + 4, 8, 3);
+
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(s.x - 4, s.y - 7 + bob, 8, 13);
 
     ctx.fillStyle = "#ffe0a8";
     ctx.fillRect(s.x - 3, s.y - 6 + bob, 6, 6);
@@ -819,6 +938,9 @@ function drawArmy() {
 
     ctx.fillStyle = "#00000080";
     ctx.fillRect(s.x - 5, s.y + 5, 10, 3);
+
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(s.x - 5, s.y - 9 + bob, 10, 13);
 
     let color = "#c0c0c0";
     if (u.type === "knight") color = "#d0d0ff";
@@ -855,6 +977,9 @@ function drawEnemyBattle() {
     ctx.fillStyle = "#00000080";
     ctx.fillRect(s.x - 5, s.y + 5, 10, 3);
 
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(s.x - 5, s.y - 9 + bob, 10, 13);
+
     ctx.fillStyle = "#ff6666";
     ctx.fillRect(s.x - 4, s.y - 8 + bob, 8, 8);
 
@@ -867,14 +992,31 @@ function drawEnemyBattle() {
 
   for (const b of battleEnemyBuildings) {
     const s = worldToScreen(b.x, b.y);
-    ctx.fillStyle = "#663333";
-    ctx.fillRect(s.x - 8, s.y - 12, 16, 12);
 
-    const ratio = b.hp / b.maxHp;
-    ctx.fillStyle = "#000000aa";
-    ctx.fillRect(s.x - 8, s.y - 14, 16, 2);
-    ctx.fillStyle = "#ff7f7f";
-    ctx.fillRect(s.x - 8, s.y - 14, 16 * ratio, 2);
+    if (!b.destroyed) {
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(s.x - 9, s.y - 13, 18, 14);
+
+      ctx.fillStyle = "#663333";
+      ctx.fillRect(s.x - 8, s.y - 12, 16, 12);
+
+      ctx.fillStyle = "#000000aa";
+      ctx.fillRect(s.x - 8, s.y - 14, 16, 2);
+      const ratio = b.hp / b.maxHp;
+      ctx.fillStyle = "#ff7f7f";
+      ctx.fillRect(s.x - 8, s.y - 14, 16 * ratio, 2);
+
+      // enemy flag
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(s.x + 6, s.y - 16, 1, 6);
+      ctx.fillStyle = "#ff2222";
+      ctx.fillRect(s.x + 7, s.y - 16, 4, 3);
+    } else {
+      // burning ruins when destroyed (victory fire)
+      ctx.fillStyle = "#3a1a1a";
+      ctx.fillRect(s.x - 8, s.y - 4, 16, 4);
+      drawFireWorld(b.x, b.y, b.fireTime);
+    }
   }
 }
 
@@ -886,6 +1028,9 @@ function drawPlayer() {
 
   ctx.fillStyle = "#00000080";
   ctx.fillRect(s.x - 6, s.y + 6, 12, 4);
+
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(s.x - 6, s.y - 11 + bob, 12, 16);
 
   ctx.fillStyle = "#ffe0a8";
   ctx.fillRect(s.x - 5, s.y - 10 + bob, 10, 8);
