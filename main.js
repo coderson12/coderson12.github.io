@@ -7,236 +7,288 @@ let height = window.innerHeight;
 canvas.width = width;
 canvas.height = height;
 
+const statsEl = document.getElementById("stats");
+const dialogEl = document.getElementById("dialog");
+
+const keys = {};
+let mouse = { x: 0, y: 0, down: false };
+
 const planet = {
-  radius: 160,
-  atmosphereRadius: 190,
-  rotation: 0,
-  rotationSpeed: 0,
-  friction: 0.96
+  radius: 220,
+  colorInner: "#2b4f9f",
+  colorOuter: "#1a2b5f"
 };
 
-let zoom = 1;
-let targetZoom = 1;
-let dragging = false;
-let lastMouse = { x: 0, y: 0 };
-let selectedTool = "house";
+const player = {
+  x: 0,
+  y: -planet.radius + 20,
+  r: 10,
+  speed: 140,
+  hp: 100,
+  maxHp: 100,
+  attackCooldown: 0,
+  attackRate: 0.4,
+  facing: 0
+};
 
-const buildings = [];
+const villagers = [];
+const monsters = [];
+const projectiles = [];
 
-const buildingTypes = {
-  house: {
-    name: "House",
-    pop: 4,
-    happiness: 2,
-    color: "#ffd27f"
-  },
-  tree: {
-    name: "Tree",
-    pop: 0,
-    happiness: 4,
-    color: "#7fe27f"
-  },
-  farm: {
-    name: "Farm",
-    pop: 6,
-    happiness: 1,
-    color: "#ffb347"
-  },
-  tower: {
-    name: "Tower",
-    pop: 2,
-    happiness: -1,
-    color: "#9fa8ff"
+const dialogLines = [
+  "Welcome to our tiny world.",
+  "The monsters keep crawling up from the dark side...",
+  "If you protect us, we'll remember you.",
+  "Sometimes I just stare into the sky and think.",
+  "This planet is small, but it's home."
+];
+
+function randRange(a, b) {
+  return a + Math.random() * (b - a);
+}
+
+function spawnVillagers() {
+  villagers.length = 0;
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2 + randRange(-0.2, 0.2);
+    const x = Math.cos(angle) * (planet.radius - 18);
+    const y = Math.sin(angle) * (planet.radius - 18);
+    villagers.push({
+      x,
+      y,
+      r: 8,
+      angle,
+      talkCooldown: 0
+    });
   }
-};
+}
 
-const popStat = document.getElementById("popStat");
-const happinessStat = document.getElementById("happinessStat");
+function spawnMonsters() {
+  monsters.length = 0;
+  for (let i = 0; i < 10; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const x = Math.cos(angle) * (planet.radius + 40);
+    const y = Math.sin(angle) * (planet.radius + 40);
+    monsters.push({
+      x,
+      y,
+      r: 9,
+      hp: 30,
+      maxHp: 30,
+      angle,
+      speed: 40 + Math.random() * 30
+    });
+  }
+}
+
+function resetGame() {
+  player.x = 0;
+  player.y = -planet.radius + 20;
+  player.hp = player.maxHp;
+  projectiles.length = 0;
+  spawnVillagers();
+  spawnMonsters();
+  dialogEl.textContent = "You wake up on a tiny planet surrounded by people who need you.";
+}
+resetGame();
 
 function updateStats() {
-  let pop = 0;
-  let happiness = 100;
-  for (const b of buildings) {
-    const t = buildingTypes[b.type];
-    pop += t.pop;
-    happiness += t.happiness;
+  const aliveMonsters = monsters.filter(m => m.hp > 0).length;
+  statsEl.textContent = `HP: ${Math.round(player.hp)} / ${player.maxHp} · Monsters: ${aliveMonsters}`;
+}
+updateStats();
+
+window.addEventListener("resize", () => {
+  width = window.innerWidth;
+  height = window.innerHeight;
+  canvas.width = width;
+  canvas.height = height;
+});
+
+window.addEventListener("keydown", e => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key.toLowerCase() === "r") {
+    resetGame();
   }
-  happiness = Math.max(0, Math.min(200, happiness));
-  popStat.textContent = `Population: ${pop}`;
-  happinessStat.textContent = `Happiness: ${happiness}`;
+  if (e.key.toLowerCase() === "e") {
+    tryTalk();
+  }
+});
+
+window.addEventListener("keyup", e => {
+  keys[e.key.toLowerCase()] = false;
+});
+
+canvas.addEventListener("mousemove", e => {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = e.clientX - rect.left;
+  mouse.y = e.clientY - rect.top;
+});
+
+canvas.addEventListener("mousedown", e => {
+  if (e.button === 0) {
+    mouse.down = true;
+    tryAttack();
+  }
+});
+
+canvas.addEventListener("mouseup", e => {
+  if (e.button === 0) mouse.down = false;
+});
+
+canvas.addEventListener("contextmenu", e => e.preventDefault());
+
+function length(x, y) {
+  return Math.sqrt(x * x + y * y);
 }
 
-function worldToScreen(x, y) {
+function normalize(x, y) {
+  const l = length(x, y) || 1;
+  return { x: x / l, y: y / l };
+}
+
+function clamp(v, a, b) {
+  return v < a ? a : v > b ? b : v;
+}
+
+function updatePlayer(dt) {
+  let mx = 0;
+  let my = 0;
+  if (keys["w"]) my -= 1;
+  if (keys["s"]) my += 1;
+  if (keys["a"]) mx -= 1;
+  if (keys["d"]) mx += 1;
+
+  if (mx !== 0 || my !== 0) {
+    const n = normalize(mx, my);
+    player.x += n.x * player.speed * dt;
+    player.y += n.y * player.speed * dt;
+  }
+
+  const dist = length(player.x, player.y);
+  const maxDist = planet.radius - 10;
+  if (dist > maxDist) {
+    const n = normalize(player.x, player.y);
+    player.x = n.x * maxDist;
+    player.y = n.y * maxDist;
+  }
+
   const cx = width / 2;
   const cy = height / 2;
-  return {
-    x: cx + x * zoom,
-    y: cy + y * zoom
-  };
-}
+  const wx = player.x + cx;
+  const wy = player.y + cy;
+  const dx = mouse.x - wx;
+  const dy = mouse.y - wy;
+  player.facing = Math.atan2(dy, dx);
 
-function screenToWorld(x, y) {
-  const cx = width / 2;
-  const cy = height / 2;
-  return {
-    x: (x - cx) / zoom,
-    y: (y - cy) / zoom
-  };
-}
+  player.attackCooldown = Math.max(0, player.attackCooldown - dt);
 
-function angleFromScreen(x, y) {
-  const w = screenToWorld(x, y);
-  const angle = Math.atan2(w.y, w.x) - planet.rotation;
-  return angle;
-}
-
-function placeBuildingAtScreen(x, y, type) {
-  const angle = angleFromScreen(x, y);
-  const snappedAngle = Math.round(angle / (Math.PI / 32)) * (Math.PI / 32);
-
-  for (const b of buildings) {
-    if (Math.abs(b.angle - snappedAngle) < 0.02) {
-      return;
-    }
+  if (mouse.down) {
+    tryAttack();
   }
 
-  buildings.push({
-    angle: snappedAngle,
-    type
+  if (player.hp <= 0) {
+    dialogEl.textContent = "You fell... Press R to wake up again.";
+  }
+}
+
+function tryAttack() {
+  if (player.attackCooldown > 0 || player.hp <= 0) return;
+  player.attackCooldown = player.attackRate;
+
+  const speed = 260;
+  const dir = { x: Math.cos(player.facing), y: Math.sin(player.facing) };
+  projectiles.push({
+    x: player.x,
+    y: player.y,
+    vx: dir.x * speed,
+    vy: dir.y * speed,
+    life: 0.8,
+    r: 4
   });
-
-  updateStats();
 }
 
-function removeBuildingAtScreen(x, y) {
-  const angle = angleFromScreen(x, y);
-  let closestIndex = -1;
-  let closestDist = 0.05;
-
-  for (let i = 0; i < buildings.length; i++) {
-    const d = Math.abs(buildings[i].angle - angle);
+function tryTalk() {
+  let closest = null;
+  let closestDist = 40;
+  for (const v of villagers) {
+    const d = length(v.x - player.x, v.y - player.y);
     if (d < closestDist) {
       closestDist = d;
-      closestIndex = i;
+      closest = v;
     }
   }
+  if (!closest) {
+    dialogEl.textContent = "No one is close enough to hear you.";
+    return;
+  }
 
-  if (closestIndex !== -1) {
-    buildings.splice(closestIndex, 1);
-    updateStats();
+  if (closest.talkCooldown > 0) return;
+
+  closest.talkCooldown = 2;
+  const line = dialogLines[Math.floor(Math.random() * dialogLines.length)];
+  dialogEl.textContent = line;
+}
+
+function updateVillagers(dt) {
+  for (const v of villagers) {
+    v.talkCooldown = Math.max(0, v.talkCooldown - dt);
   }
 }
 
-function drawPlanet() {
-  const cx = width / 2;
-  const cy = height / 2;
+function updateMonsters(dt) {
+  for (const m of monsters) {
+    if (m.hp <= 0) continue;
 
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.scale(zoom, zoom);
+    const dx = player.x - m.x;
+    const dy = player.y - m.y;
+    const n = normalize(dx, dy);
+    m.x += n.x * m.speed * dt;
+    m.y += n.y * m.speed * dt;
 
-  const grad = ctx.createRadialGradient(
-    0, 0, planet.radius * 0.2,
-    0, 0, planet.radius
-  );
-  grad.addColorStop(0, "#3b9cff");
-  grad.addColorStop(0.5, "#2f7fd1");
-  grad.addColorStop(1, "#1b3f7a");
+    const dist = length(m.x, m.y);
+    const minDist = planet.radius - 5;
+    if (dist < minDist) {
+      const nn = normalize(m.x, m.y);
+      m.x = nn.x * minDist;
+      m.y = nn.y * minDist;
+    }
 
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.arc(0, 0, planet.radius, 0, Math.PI * 2);
-  ctx.fill();
-
-  const atmGrad = ctx.createRadialGradient(
-    0, 0, planet.radius,
-    0, 0, planet.atmosphereRadius
-  );
-  atmGrad.addColorStop(0, "rgba(169,220,255,0.35)");
-  atmGrad.addColorStop(1, "rgba(169,220,255,0)");
-
-  ctx.fillStyle = atmGrad;
-  ctx.beginPath();
-  ctx.arc(0, 0, planet.atmosphereRadius, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.save();
-  ctx.rotate(planet.rotation);
-
-  ctx.strokeStyle = "rgba(0,0,0,0.25)";
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  for (let i = 0; i < 64; i++) {
-    const a = (i / 64) * Math.PI * 2;
-    const x = Math.cos(a) * planet.radius;
-    const y = Math.sin(a) * planet.radius;
-    ctx.moveTo(x, y);
-    ctx.lineTo(x * 1.02, y * 1.02);
+    const dToPlayer = length(m.x - player.x, m.y - player.y);
+    if (dToPlayer < m.r + player.r + 2 && player.hp > 0) {
+      player.hp -= 20 * dt;
+      player.hp = clamp(player.hp, 0, player.maxHp);
+      if (player.hp <= 0) {
+        player.hp = 0;
+      }
+    }
   }
-  ctx.stroke();
-
-  for (const b of buildings) {
-    drawBuilding(b);
-  }
-
-  ctx.restore();
-  ctx.restore();
 }
 
-function drawBuilding(b) {
-  const baseR = planet.radius;
-  const x = Math.cos(b.angle) * baseR;
-  const y = Math.sin(b.angle) * baseR;
+function updateProjectiles(dt) {
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const p = projectiles[i];
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.life -= dt;
+    if (p.life <= 0) {
+      projectiles.splice(i, 1);
+      continue;
+    }
 
-  const t = buildingTypes[b.type];
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(b.angle + Math.PI / 2);
-
-  ctx.fillStyle = "rgba(0,0,0,0.35)";
-  ctx.beginPath();
-  ctx.ellipse(0, baseR * 0.02, 10, 4, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.translate(0, -8);
-
-  ctx.fillStyle = t.color;
-  if (b.type === "house") {
-    ctx.fillRect(-8, -14, 16, 14);
-    ctx.beginPath();
-    ctx.moveTo(-9, -14);
-    ctx.lineTo(0, -22);
-    ctx.lineTo(9, -14);
-    ctx.closePath();
-    ctx.fillStyle = "#f4f4f4";
-    ctx.fill();
-    ctx.fillStyle = t.color;
-  } else if (b.type === "tree") {
-    ctx.fillStyle = "#5c3b1a";
-    ctx.fillRect(-2, -10, 4, 10);
-    ctx.fillStyle = t.color;
-    ctx.beginPath();
-    ctx.arc(0, -14, 8, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (b.type === "farm") {
-    ctx.fillRect(-10, -10, 20, 10);
-    ctx.fillStyle = "#8fdc6f";
-    ctx.fillRect(-9, -9, 18, 4);
-    ctx.fillStyle = t.color;
-  } else if (b.type === "tower") {
-    ctx.fillRect(-4, -18, 8, 18);
-    ctx.fillStyle = "#dfe3ff";
-    ctx.fillRect(-3, -16, 6, 4);
-    ctx.fillRect(-3, -10, 6, 4);
-    ctx.fillStyle = t.color;
+    for (const m of monsters) {
+      if (m.hp <= 0) continue;
+      const d = length(p.x - m.x, p.y - m.y);
+      if (d < m.r + p.r) {
+        m.hp -= 20;
+        projectiles.splice(i, 1);
+        break;
+      }
+    }
   }
-
-  ctx.restore();
 }
 
 function drawBackground() {
-  ctx.clearRect(0, 0, width, height);
-
   const grad = ctx.createLinearGradient(0, 0, 0, height);
   grad.addColorStop(0, "#050816");
   grad.addColorStop(1, "#0b1630");
@@ -254,16 +306,138 @@ function drawBackground() {
   }
 }
 
-function update(dt) {
-  planet.rotation += planet.rotationSpeed * dt;
-  planet.rotationSpeed *= planet.friction;
+function drawPlanet() {
+  const cx = width / 2;
+  const cy = height / 2;
 
-  zoom += (targetZoom - zoom) * 0.1;
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  const grad = ctx.createRadialGradient(
+    0, 0, planet.radius * 0.2,
+    0, 0, planet.radius
+  );
+  grad.addColorStop(0, planet.colorInner);
+  grad.addColorStop(1, planet.colorOuter);
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(0, 0, planet.radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(0,0,0,0.25)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  for (let i = 0; i < 64; i++) {
+    const a = (i / 64) * Math.PI * 2;
+    const x = Math.cos(a) * planet.radius;
+    const y = Math.sin(a) * planet.radius;
+    ctx.moveTo(x, y);
+    ctx.lineTo(x * 1.02, y * 1.02);
+  }
+  ctx.stroke();
+
+  ctx.restore();
 }
 
-function render() {
-  drawBackground();
-  drawPlanet();
+function drawVillagers() {
+  const cx = width / 2;
+  const cy = height / 2;
+
+  for (const v of villagers) {
+    ctx.save();
+    ctx.translate(cx + v.x, cy + v.y);
+
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.beginPath();
+    ctx.ellipse(0, 8, 8, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#ffe0a8";
+    ctx.beginPath();
+    ctx.arc(0, -4, v.r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#4f9cff";
+    ctx.fillRect(-v.r + 1, -2, v.r * 2 - 2, 8);
+
+    ctx.restore();
+  }
+}
+
+function drawMonsters() {
+  const cx = width / 2;
+  const cy = height / 2;
+
+  for (const m of monsters) {
+    if (m.hp <= 0) continue;
+
+    ctx.save();
+    ctx.translate(cx + m.x, cy + m.y);
+
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.beginPath();
+    ctx.ellipse(0, 8, 9, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#ff4f6a";
+    ctx.beginPath();
+    ctx.arc(0, -2, m.r, 0, Math.PI * 2);
+    ctx.fill();
+
+    const hpRatio = m.hp / m.maxHp;
+    ctx.fillStyle = "#000000aa";
+    ctx.fillRect(-10, -18, 20, 3);
+    ctx.fillStyle = "#ff6f7f";
+    ctx.fillRect(-10, -18, 20 * hpRatio, 3);
+
+    ctx.restore();
+  }
+}
+
+function drawProjectiles() {
+  const cx = width / 2;
+  const cy = height / 2;
+
+  ctx.fillStyle = "#ffd27f";
+  for (const p of projectiles) {
+    ctx.beginPath();
+    ctx.arc(cx + p.x, cy + p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawPlayer() {
+  const cx = width / 2;
+  const cy = height / 2;
+
+  ctx.save();
+  ctx.translate(cx + player.x, cy + player.y);
+
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.beginPath();
+  ctx.ellipse(0, 10, 10, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.rotate(player.facing);
+
+  ctx.fillStyle = "#ffd27f";
+  ctx.beginPath();
+  ctx.arc(0, -6, player.r, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#7fe2ff";
+  ctx.fillRect(-player.r + 2, -2, player.r * 2 - 4, 10);
+
+  ctx.fillStyle = "#ffd27f";
+  ctx.fillRect(4, -2, 8, 3);
+
+  ctx.restore();
+
+  const hpRatio = player.hp / player.maxHp;
+  ctx.fillStyle = "#000000aa";
+  ctx.fillRect(cx - 40, cy + planet.radius + 20, 80, 6);
+  ctx.fillStyle = "#7fff7f";
+  ctx.fillRect(cx - 40, cy + planet.radius + 20, 80 * hpRatio, 6);
 }
 
 let lastTime = performance.now();
@@ -271,72 +445,21 @@ function loop(now) {
   const dt = Math.min(0.05, (now - lastTime) / 1000);
   lastTime = now;
 
-  update(dt);
-  render();
+  updatePlayer(dt);
+  updateVillagers(dt);
+  updateMonsters(dt);
+  updateProjectiles(dt);
+  updateStats();
+
+  ctx.clearRect(0, 0, width, height);
+  drawBackground();
+  drawPlanet();
+  drawVillagers();
+  drawMonsters();
+  drawProjectiles();
+  drawPlayer();
 
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
 
-window.addEventListener("resize", () => {
-  width = window.innerWidth;
-  height = window.innerHeight;
-  canvas.width = width;
-  canvas.height = height;
-});
-
-canvas.addEventListener("mousedown", e => {
-  if (e.button === 0) {
-    if (e.ctrlKey || e.metaKey) {
-      removeBuildingAtScreen(e.clientX, e.clientY);
-    } else {
-      placeBuildingAtScreen(e.clientX, e.clientY, selectedTool);
-    }
-  } else if (e.button === 2) {
-    removeBuildingAtScreen(e.clientX, e.clientY);
-  }
-
-  dragging = true;
-  lastMouse.x = e.clientX;
-  lastMouse.y = e.clientY;
-});
-
-canvas.addEventListener("mousemove", e => {
-  if (dragging) {
-    const dx = e.clientX - lastMouse.x;
-    planet.rotation += dx * 0.005;
-    lastMouse.x = e.clientX;
-    lastMouse.y = e.clientY;
-  }
-});
-
-canvas.addEventListener("mouseup", () => {
-  dragging = false;
-});
-
-canvas.addEventListener("mouseleave", () => {
-  dragging = false;
-});
-
-canvas.addEventListener("contextmenu", e => {
-  e.preventDefault();
-});
-
-canvas.addEventListener("wheel", e => {
-  e.preventDefault();
-  const delta = -Math.sign(e.deltaY) * 0.1;
-  targetZoom = Math.max(0.5, Math.min(2.2, targetZoom + delta));
-}, { passive: false });
-
-document.querySelectorAll(".tool").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tool").forEach(b => b.classList.remove("selected"));
-    btn.classList.add("selected");
-    selectedTool = btn.dataset.type;
-  });
-});
-
-document.getElementById("clearBtn").addEventListener("click", () => {
-  buildings.length = 0;
-  updateStats();
-});
