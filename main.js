@@ -1,191 +1,152 @@
-// -----------------------------
-// USER SYSTEM (LocalStorage)
-// -----------------------------
-function getUsers() {
-  return JSON.parse(localStorage.getItem("users") || "{}");
+/* GLOBAL */
+body {
+  margin: 0;
+  font-family: Poppins, sans-serif;
+  background: #0f172a;
+  color: white;
+  overflow-x: hidden;
 }
 
-function saveUser(username, password) {
-  const users = getUsers();
-  users[username] = password;
-  localStorage.setItem("users", JSON.stringify(users));
+.screen {
+  display: none;
+  text-align: center;
+  padding: 40px;
+  animation: fadeIn 0.5s ease;
 }
 
-function validateUser(username, password) {
-  const users = getUsers();
-  return users[username] === password;
+.screen.active {
+  display: block;
 }
 
-// -----------------------------
-// ELEMENTS
-// -----------------------------
-const authSection = document.getElementById("auth-section");
-const gameSection = document.getElementById("game-section");
-
-const signupUser = document.getElementById("signup-user");
-const signupPass = document.getElementById("signup-pass");
-const signupBtn = document.getElementById("signup-btn");
-const signupMsg = document.getElementById("signup-msg");
-
-const loginUser = document.getElementById("login-user");
-const loginPass = document.getElementById("login-pass");
-const loginBtn = document.getElementById("login-btn");
-const loginMsg = document.getElementById("login-msg");
-
-const playerName = document.getElementById("player-name");
-const startBtn = document.getElementById("start-btn");
-
-const quizBox = document.getElementById("quiz-box");
-const questionText = document.getElementById("question");
-const optionsDiv = document.getElementById("options");
-const nextBtn = document.getElementById("next-btn");
-
-const resultBox = document.getElementById("result-box");
-const scoreText = document.getElementById("score");
-const restartBtn = document.getElementById("restart-btn");
-
-// -----------------------------
-// QUIZ DATA
-// -----------------------------
-const quiz = [
-  {
-    q: "What does HTML stand for?",
-    options: [
-      "Hyper Trainer Marking Language",
-      "Hyper Text Markup Language",
-      "Hyper Text Marketing Language",
-      "Hyper Tool Multi Language"
-    ],
-    answer: 1
-  },
-  {
-    q: "Which language runs in the browser?",
-    options: ["Python", "C++", "JavaScript", "Java"],
-    answer: 2
-  },
-  {
-    q: "What does CSS control?",
-    options: ["Structure", "Style", "Database", "Server"],
-    answer: 1
-  }
-];
-
-let currentIndex = 0;
-let selected = null;
-let score = 0;
-
-// -----------------------------
-// SIGNUP
-// -----------------------------
-signupBtn.addEventListener("click", () => {
-  const user = signupUser.value.trim();
-  const pass = signupPass.value.trim();
-
-  if (!user || !pass) {
-    signupMsg.textContent = "Enter username & password";
-    signupMsg.style.color = "red";
-    return;
-  }
-
-  const users = getUsers();
-  if (users[user]) {
-    signupMsg.textContent = "Username already exists";
-    signupMsg.style.color = "red";
-    return;
-  }
-
-  saveUser(user, pass);
-  signupMsg.textContent = "Account created!";
-  signupMsg.style.color = "lightgreen";
-});
-
-// -----------------------------
-// LOGIN
-// -----------------------------
-loginBtn.addEventListener("click", () => {
-  const user = loginUser.value.trim();
-  const pass = loginPass.value.trim();
-
-  if (validateUser(user, pass)) {
-    authSection.classList.add("hidden");
-    gameSection.classList.remove("hidden");
-    playerName.textContent = user;
-  } else {
-    loginMsg.textContent = "Invalid login";
-    loginMsg.style.color = "red";
-  }
-});
-
-// -----------------------------
-// START QUIZ
-// -----------------------------
-startBtn.addEventListener("click", () => {
-  currentIndex = 0;
-  score = 0;
-  quizBox.classList.remove("hidden");
-  resultBox.classList.add("hidden");
-  loadQuestion();
-});
-
-// -----------------------------
-// LOAD QUESTION
-// -----------------------------
-function loadQuestion() {
-  const q = quiz[currentIndex];
-  questionText.textContent = q.q;
-
-  optionsDiv.innerHTML = "";
-  selected = null;
-  nextBtn.classList.add("hidden");
-
-  q.options.forEach((opt, i) => {
-    const btn = document.createElement("div");
-    btn.className = "option";
-    btn.textContent = opt;
-
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".option").forEach(o => o.classList.remove("selected"));
-      btn.classList.add("selected");
-      selected = i;
-      nextBtn.classList.remove("hidden");
-    });
-
-    optionsDiv.appendChild(btn);
-  });
-
-  nextBtn.textContent = currentIndex === quiz.length - 1 ? "Submit" : "Next";
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-// -----------------------------
-// NEXT / SUBMIT
-// -----------------------------
-nextBtn.addEventListener("click", () => {
-  if (selected === quiz[currentIndex].answer) {
-    score++;
-  }
-
-  currentIndex++;
-
-  if (currentIndex < quiz.length) {
-    loadQuestion();
-  } else {
-    showResults();
-  }
-});
-
-// -----------------------------
-// RESULTS
-// -----------------------------
-function showResults() {
-  quizBox.classList.add("hidden");
-  resultBox.classList.remove("hidden");
-  scoreText.textContent = `You scored ${score} / ${quiz.length}`;
+/* HOME SCREEN */
+.title {
+  font-size: 3rem;
+  margin-bottom: 10px;
+  color: #38bdf8;
+  animation: float 3s infinite ease-in-out;
 }
 
-// -----------------------------
-// RESTART
-// -----------------------------
-restartBtn.addEventListener("click", () => {
-  resultBox.classList.add("hidden");
-  quizBox.classList.add("hidden");
-});
+.subtitle {
+  font-size: 1.2rem;
+  opacity: 0.8;
+  margin-bottom: 40px;
+}
+
+@keyframes float {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+  100% { transform: translateY(0); }
+}
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  width: 250px;
+  margin: auto;
+}
+
+.menu-btn {
+  padding: 15px;
+  border-radius: 10px;
+  border: none;
+  background: #1e293b;
+  color: white;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.menu-btn:hover {
+  background: #38bdf8;
+  transform: scale(1.05);
+}
+
+/* CARDS */
+.card {
+  background: #1e293b;
+  padding: 20px;
+  border-radius: 10px;
+  margin: 20px auto;
+  width: 90%;
+  max-width: 500px;
+}
+
+input, select {
+  width: 100%;
+  padding: 12px;
+  margin: 8px 0;
+  border-radius: 8px;
+  border: none;
+  background: #0f172a;
+  color: white;
+}
+
+button {
+  padding: 12px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #38bdf8;
+  color: #0f172a;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+button:hover {
+  transform: scale(1.05);
+}
+
+/* QUIZ OPTIONS */
+.option {
+  background: #1e293b;
+  padding: 15px;
+  margin: 10px 0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.option:hover {
+  background: #334155;
+}
+
+.option.selected {
+  background: #0ea5e9;
+  color: black;
+}
+
+/* BACK BUTTON */
+.back-btn {
+  margin-top: 20px;
+  background: #64748b;
+}
+
+.hidden {
+  display: none;
+}
+
+/* LIGHT THEME */
+.light {
+  background: #f1f5f9;
+  color: black;
+}
+
+.light .card {
+  background: white;
+}
+
+.light .menu-btn {
+  background: #e2e8f0;
+  color: black;
+}
+
+.light .option {
+  background: #e2e8f0;
+  color: black;
+}
