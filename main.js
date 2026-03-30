@@ -1,152 +1,220 @@
-/* GLOBAL */
-body {
-  margin: 0;
-  font-family: Poppins, sans-serif;
-  background: #0f172a;
-  color: white;
-  overflow-x: hidden;
+// -----------------------------
+// SCREEN SWITCHING
+// -----------------------------
+function show(screen) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(screen).classList.add("active");
 }
 
-.screen {
-  display: none;
-  text-align: center;
-  padding: 40px;
-  animation: fadeIn 0.5s ease;
+// -----------------------------
+// USER SYSTEM
+// -----------------------------
+function getUsers() {
+  return JSON.parse(localStorage.getItem("users") || "{}");
 }
 
-.screen.active {
-  display: block;
+function saveUser(username, password) {
+  const users = getUsers();
+  users[username] = password;
+  localStorage.setItem("users", JSON.stringify(users));
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+function validateUser(username, password) {
+  const users = getUsers();
+  return users[username] === password;
 }
 
-/* HOME SCREEN */
-.title {
-  font-size: 3rem;
-  margin-bottom: 10px;
-  color: #38bdf8;
-  animation: float 3s infinite ease-in-out;
+let currentUser = null;
+
+// -----------------------------
+// QUIZ STORAGE
+// -----------------------------
+function getQuizzes() {
+  return JSON.parse(localStorage.getItem("quizzes") || "[]");
 }
 
-.subtitle {
-  font-size: 1.2rem;
-  opacity: 0.8;
-  margin-bottom: 40px;
+function saveQuiz(quiz) {
+  const quizzes = getQuizzes();
+  quizzes.push(quiz);
+  localStorage.setItem("quizzes", JSON.stringify(quizzes));
 }
 
-@keyframes float {
-  0% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-  100% { transform: translateY(0); }
+// -----------------------------
+// LOGIN / SIGNUP
+// -----------------------------
+document.getElementById("login-btn").onclick = () => show("auth-screen");
+
+document.getElementById("auth-login").onclick = () => {
+  const user = auth-user.value.trim();
+  const pass = auth-pass.value.trim();
+
+  if (validateUser(user, pass)) {
+    currentUser = user;
+    auth-msg.textContent = "Logged in!";
+    setTimeout(() => show("home-screen"), 600);
+  } else {
+    auth-msg.textContent = "Invalid login";
+  }
+};
+
+document.getElementById("auth-signup").onclick = () => {
+  const user = auth-user.value.trim();
+  const pass = auth-pass.value.trim();
+
+  if (!user || !pass) {
+    auth-msg.textContent = "Enter username & password";
+    return;
+  }
+
+  saveUser(user, pass);
+  auth-msg.textContent = "Account created!";
+};
+
+// -----------------------------
+// PLAY SCREEN
+// -----------------------------
+document.getElementById("play-btn").onclick = () => {
+  loadQuizList();
+  show("play-screen");
+};
+
+function loadQuizList() {
+  const list = document.getElementById("quiz-list");
+  list.innerHTML = "";
+
+  const quizzes = getQuizzes();
+
+  quizzes.forEach((quiz, index) => {
+    const btn = document.createElement("button");
+    btn.textContent = quiz.title;
+    btn.onclick = () => startGame(index);
+    list.appendChild(btn);
+  });
 }
 
-.menu-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  width: 250px;
-  margin: auto;
+// -----------------------------
+// GAME LOGIC
+// -----------------------------
+let currentQuiz = null;
+let qIndex = 0;
+let score = 0;
+
+function startGame(index) {
+  currentQuiz = getQuizzes()[index];
+  qIndex = 0;
+  score = 0;
+  show("game-screen");
+  loadQuestion();
 }
 
-.menu-btn {
-  padding: 15px;
-  border-radius: 10px;
-  border: none;
-  background: #1e293b;
-  color: white;
-  font-size: 1.1rem;
-  cursor: pointer;
-  transition: 0.2s;
+function loadQuestion() {
+  const q = currentQuiz.questions[qIndex];
+  document.getElementById("game-question").textContent = q.q;
+
+  const optionsDiv = document.getElementById("game-options");
+  optionsDiv.innerHTML = "";
+
+  q.options.forEach((opt, i) => {
+    const div = document.createElement("div");
+    div.className = "option";
+    div.textContent = opt;
+
+    div.onclick = () => {
+      document.querySelectorAll(".option").forEach(o => o.classList.remove("selected"));
+      div.classList.add("selected");
+      document.getElementById("game-next").classList.remove("hidden");
+      div.dataset.index = i;
+    };
+
+    optionsDiv.appendChild(div);
+  });
+
+  document.getElementById("game-next").onclick = () => {
+    const selected = document.querySelector(".option.selected");
+    if (!selected) return;
+
+    if (parseInt(selected.dataset.index) === q.answer) score++;
+
+    qIndex++;
+
+    if (qIndex >= currentQuiz.questions.length) {
+      showResults();
+    } else {
+      loadQuestion();
+    }
+  };
 }
 
-.menu-btn:hover {
-  background: #38bdf8;
-  transform: scale(1.05);
+function showResults() {
+  document.getElementById("result-score").textContent =
+    `You scored ${score} / ${currentQuiz.questions.length}`;
+  show("result-screen");
 }
 
-/* CARDS */
-.card {
-  background: #1e293b;
-  padding: 20px;
-  border-radius: 10px;
-  margin: 20px auto;
-  width: 90%;
-  max-width: 500px;
-}
+document.getElementById("result-home").onclick = () => show("home-screen");
 
-input, select {
-  width: 100%;
-  padding: 12px;
-  margin: 8px 0;
-  border-radius: 8px;
-  border: none;
-  background: #0f172a;
-  color: white;
-}
+// -----------------------------
+// CREATE QUIZ
+// -----------------------------
+document.getElementById("create-btn").onclick = () => show("create-screen");
 
-button {
-  padding: 12px 20px;
-  border-radius: 8px;
-  border: none;
-  background: #38bdf8;
-  color: #0f172a;
-  font-weight: bold;
-  cursor: pointer;
-  transition: 0.2s;
-}
+document.getElementById("add-question").onclick = () => {
+  const container = document.getElementById("questions-container");
 
-button:hover {
-  transform: scale(1.05);
-}
+  const block = document.createElement("div");
+  block.className = "card";
+  block.innerHTML = `
+    <input class="q-text" type="text" placeholder="Question">
+    <input class="q-opt" type="text" placeholder="Option 1">
+    <input class="q-opt" type="text" placeholder="Option 2">
+    <input class="q-opt" type="text" placeholder="Option 3">
+    <input class="q-opt" type="text" placeholder="Option 4">
+    <input class="q-answer" type="number" min="1" max="4" placeholder="Correct Option #">
+  `;
 
-/* QUIZ OPTIONS */
-.option {
-  background: #1e293b;
-  padding: 15px;
-  margin: 10px 0;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: 0.2s;
-}
+  container.appendChild(block);
+};
 
-.option:hover {
-  background: #334155;
-}
+document.getElementById("save-quiz").onclick = () => {
+  const title = document.getElementById("quiz-title").value.trim();
+  const blocks = document.querySelectorAll("#questions-container .card");
 
-.option.selected {
-  background: #0ea5e9;
-  color: black;
-}
+  const questions = [];
 
-/* BACK BUTTON */
-.back-btn {
-  margin-top: 20px;
-  background: #64748b;
-}
+  blocks.forEach(block => {
+    const q = block.querySelector(".q-text").value;
+    const opts = [...block.querySelectorAll(".q-opt")].map(i => i.value);
+    const ans = parseInt(block.querySelector(".q-answer").value) - 1;
 
-.hidden {
-  display: none;
-}
+    if (q && opts.every(o => o) && ans >= 0) {
+      questions.push({ q, options: opts, answer: ans });
+    }
+  });
 
-/* LIGHT THEME */
-.light {
-  background: #f1f5f9;
-  color: black;
-}
+  if (!title || questions.length === 0) return alert("Fill everything!");
 
-.light .card {
-  background: white;
-}
+  saveQuiz({ title, questions });
 
-.light .menu-btn {
-  background: #e2e8f0;
-  color: black;
-}
+  alert("Quiz saved!");
+  show("home-screen");
+};
 
-.light .option {
-  background: #e2e8f0;
-  color: black;
-}
+// -----------------------------
+// SETTINGS
+// -----------------------------
+document.getElementById("settings-btn").onclick = () => show("settings-screen");
+
+document.getElementById("theme-select").onchange = (e) => {
+  if (e.target.value === "light") {
+    document.body.classList.add("light");
+  } else {
+    document.body.classList.remove("light");
+  }
+};
+
+// -----------------------------
+// BACK BUTTONS
+// -----------------------------
+document.querySelectorAll(".back-btn").forEach(btn => {
+  btn.onclick = () => show("home-screen");
+});
