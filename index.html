@@ -1,68 +1,57 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Tiny Civilization – Battle Edition</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <title>LearnAssist</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <canvas id="game"></canvas>
 
-  <div id="ui-left">
-    <div id="shop-title">SHOP</div>
-    <div id="shop-coins">
-      <span class="coin-icon"></span>
-      <span id="shop-coins-text">0</span>
-    </div>
-    <div id="shop-list">
-      <!-- Buildings -->
-      <button class="shop-item" data-type="house">House (50c)</button>
-      <button class="shop-item" data-type="farm">Farm (80c)</button>
-      <button class="shop-item" data-type="market">Market (150c)</button>
-      <button class="shop-item" data-type="temple">Temple (200c)</button>
-      <button class="shop-item" data-type="barracks">Barracks (250c)</button>
-      <button class="shop-item" data-type="forge">Forge (220c)</button>
-      <button class="shop-item" data-type="tower">Watch Tower (180c)</button>
+  <div class="container">
+    <h1>LearnAssist</h1>
 
-      <!-- Army units -->
-      <div class="shop-section-label">Army Units</div>
-      <button class="shop-item" data-type="knight">Knight (120c)</button>
-      <button class="shop-item" data-type="archer">Archer (100c)</button>
-      <button class="shop-item" data-type="mage">Mage (160c)</button>
-      <button class="shop-item" data-type="spearman">Spearman (90c)</button>
+    <!-- AUTH SECTION -->
+    <div id="auth-section">
+      <div class="card">
+        <h2>Create Account</h2>
+        <input id="signup-user" type="text" placeholder="Username">
+        <input id="signup-pass" type="password" placeholder="Password">
+        <button id="signup-btn">Sign Up</button>
+        <p id="signup-msg" class="msg"></p>
+      </div>
 
-      <!-- Upgrades -->
-      <div class="shop-section-label">Upgrades</div>
-      <button class="shop-item" data-type="armor1">Armor I (300c)</button>
-      <button class="shop-item" data-type="armor2">Armor II (600c)</button>
-      <button class="shop-item" data-type="weapon1">Weapons I (280c)</button>
-      <button class="shop-item" data-type="weapon2">Weapons II (550c)</button>
-      <button class="shop-item" data-type="training">Training Grounds (400c)</button>
-      <button class="shop-item" data-type="banner">War Banner (350c)</button>
-      <button class="shop-item" data-type="healer">Healer (200c)</button>
-      <button class="shop-item" data-type="siege">Siege Engine (500c)</button>
+      <div class="card">
+        <h2>Log In</h2>
+        <input id="login-user" type="text" placeholder="Username">
+        <input id="login-pass" type="password" placeholder="Password">
+        <button id="login-btn">Log In</button>
+        <p id="login-msg" class="msg"></p>
+      </div>
     </div>
 
-    <div id="raid-panel">
-      <div class="raid-title">RAID TARGETS</div>
-      <button class="raid-btn" data-diff="easy">Bandit Camp (Easy)</button>
-      <button class="raid-btn" data-diff="medium">Fortified Village (Medium)</button>
-      <button class="raid-btn" data-diff="hard">Dark Fortress (Hard)</button>
+    <!-- GAME SECTION -->
+    <div id="game-section" class="hidden">
+      <div class="card">
+        <h2>Welcome, <span id="player-name"></span></h2>
+        <button id="start-btn">Start Quiz</button>
+      </div>
+
+      <div id="quiz-box" class="card hidden">
+        <h2 id="question"></h2>
+        <div id="options"></div>
+        <button id="next-btn" class="hidden">Next</button>
+      </div>
+
+      <div id="result-box" class="card hidden">
+        <h2>Results</h2>
+        <p id="score"></p>
+        <button id="restart-btn">Play Again</button>
+      </div>
     </div>
+
   </div>
 
-  <div id="ui-top">
-    <div id="title">Tiny Civilization – Battle Edition</div>
-    <div id="help">
-      WASD = move · Mouse = select tile · Left click = build/place<br />
-      1–3 = building mode · 4 = hire near house · E = talk · R = center camera<br />
-      Army: Hold SHIFT + click on ground to set rally point · Click raid to invade.
-    </div>
-    <div id="stats"></div>
-    <div id="dialog"></div>
-  </div>
-
-  <script src="main.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
 
