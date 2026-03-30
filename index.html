@@ -7,51 +7,91 @@
 </head>
 <body>
 
-  <div class="container">
-    <h1>LearnAssist</h1>
+  <div id="app">
 
-    <!-- AUTH SECTION -->
-    <div id="auth-section">
-      <div class="card">
-        <h2>Create Account</h2>
-        <input id="signup-user" type="text" placeholder="Username">
-        <input id="signup-pass" type="password" placeholder="Password">
-        <button id="signup-btn">Sign Up</button>
-        <p id="signup-msg" class="msg"></p>
-      </div>
+    <!-- HOME SCREEN -->
+    <div id="home-screen" class="screen active">
+      <h1 class="title">LearnAssist</h1>
+      <p class="subtitle">Learn. Play. Create.</p>
 
-      <div class="card">
-        <h2>Log In</h2>
-        <input id="login-user" type="text" placeholder="Username">
-        <input id="login-pass" type="password" placeholder="Password">
-        <button id="login-btn">Log In</button>
-        <p id="login-msg" class="msg"></p>
+      <div class="menu-buttons">
+        <button id="play-btn" class="menu-btn">Play</button>
+        <button id="create-btn" class="menu-btn">Create Quiz</button>
+        <button id="settings-btn" class="menu-btn">Settings</button>
+        <button id="login-btn" class="menu-btn">Login / Signup</button>
       </div>
     </div>
 
-    <!-- GAME SECTION -->
-    <div id="game-section" class="hidden">
+    <!-- LOGIN / SIGNUP -->
+    <div id="auth-screen" class="screen">
+      <h2>Login / Signup</h2>
+
       <div class="card">
-        <h2>Welcome, <span id="player-name"></span></h2>
-        <button id="start-btn">Start Quiz</button>
+        <input id="auth-user" type="text" placeholder="Username">
+        <input id="auth-pass" type="password" placeholder="Password">
+        <button id="auth-login">Login</button>
+        <button id="auth-signup">Sign Up</button>
+        <p id="auth-msg"></p>
       </div>
 
-      <div id="quiz-box" class="card hidden">
-        <h2 id="question"></h2>
-        <div id="options"></div>
-        <button id="next-btn" class="hidden">Next</button>
+      <button class="back-btn">Back</button>
+    </div>
+
+    <!-- PLAY SCREEN -->
+    <div id="play-screen" class="screen">
+      <h2>Select a Quiz</h2>
+      <div id="quiz-list"></div>
+      <button class="back-btn">Back</button>
+    </div>
+
+    <!-- QUIZ GAME -->
+    <div id="game-screen" class="screen">
+      <h2 id="game-question"></h2>
+      <div id="game-options"></div>
+      <button id="game-next" class="hidden">Next</button>
+      <button class="back-btn">Quit</button>
+    </div>
+
+    <!-- RESULTS -->
+    <div id="result-screen" class="screen">
+      <h2>Results</h2>
+      <p id="result-score"></p>
+      <button id="result-home">Home</button>
+    </div>
+
+    <!-- CREATE QUIZ -->
+    <div id="create-screen" class="screen">
+      <h2>Create a Quiz</h2>
+
+      <div class="card">
+        <input id="quiz-title" type="text" placeholder="Quiz Title">
+
+        <div id="questions-container"></div>
+
+        <button id="add-question">Add Question</button>
+        <button id="save-quiz">Save Quiz</button>
       </div>
 
-      <div id="result-box" class="card hidden">
-        <h2>Results</h2>
-        <p id="score"></p>
-        <button id="restart-btn">Play Again</button>
+      <button class="back-btn">Back</button>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="settings-screen" class="screen">
+      <h2>Settings</h2>
+
+      <div class="card">
+        <label>Theme:</label>
+        <select id="theme-select">
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+        </select>
       </div>
+
+      <button class="back-btn">Back</button>
     </div>
 
   </div>
 
-  <script src="app.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>
-
