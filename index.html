@@ -2,94 +2,37 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>LearnAssist</title>
+  <title>PianoVerse Multiplayer Keyboard</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
   <div id="app">
+    <header>
+      <h1>PianoVerse Keys</h1>
+      <p>Press keys on your keyboard to play. Hold Shift for black notes.</p>
+    </header>
 
-    <!-- HOME SCREEN -->
-    <div id="home-screen" class="screen active">
-      <h1 class="title">LearnAssist</h1>
-      <p class="subtitle">Learn. Play. Create.</p>
+    <main>
+      <section id="players-section">
+        <h2>Players</h2>
+        <div class="card">
+          <input id="player-name-input" type="text" placeholder="Enter your name">
+          <button id="join-btn">Join Session</button>
+        </div>
+        <ul id="players-list"></ul>
+      </section>
 
-      <div class="menu-buttons">
-        <button id="play-btn" class="menu-btn">Play</button>
-        <button id="create-btn" class="menu-btn">Create Quiz</button>
-        <button id="settings-btn" class="menu-btn">Settings</button>
-        <button id="login-btn" class="menu-btn">Login / Signup</button>
-      </div>
-    </div>
+      <section id="piano-section">
+        <h2>Piano</h2>
+        <div id="piano-visual"></div>
+        <p class="hint">Try keys: 1 2 3 4 5 6 7 8 9 0 - = q w e r ... m</p>
+      </section>
 
-    <!-- LOGIN / SIGNUP -->
-    <div id="auth-screen" class="screen">
-      <h2>Login / Signup</h2>
-
-      <div class="card">
-        <input id="auth-user" type="text" placeholder="Username">
-        <input id="auth-pass" type="password" placeholder="Password">
-        <button id="auth-login">Login</button>
-        <button id="auth-signup">Sign Up</button>
-        <p id="auth-msg"></p>
-      </div>
-
-      <button class="back-btn">Back</button>
-    </div>
-
-    <!-- PLAY SCREEN -->
-    <div id="play-screen" class="screen">
-      <h2>Select a Quiz</h2>
-      <div id="quiz-list"></div>
-      <button class="back-btn">Back</button>
-    </div>
-
-    <!-- QUIZ GAME -->
-    <div id="game-screen" class="screen">
-      <h2 id="game-question"></h2>
-      <div id="game-options"></div>
-      <button id="game-next" class="hidden">Next</button>
-      <button class="back-btn">Quit</button>
-    </div>
-
-    <!-- RESULTS -->
-    <div id="result-screen" class="screen">
-      <h2>Results</h2>
-      <p id="result-score"></p>
-      <button id="result-home">Home</button>
-    </div>
-
-    <!-- CREATE QUIZ -->
-    <div id="create-screen" class="screen">
-      <h2>Create a Quiz</h2>
-
-      <div class="card">
-        <input id="quiz-title" type="text" placeholder="Quiz Title">
-
-        <div id="questions-container"></div>
-
-        <button id="add-question">Add Question</button>
-        <button id="save-quiz">Save Quiz</button>
-      </div>
-
-      <button class="back-btn">Back</button>
-    </div>
-
-    <!-- SETTINGS -->
-    <div id="settings-screen" class="screen">
-      <h2>Settings</h2>
-
-      <div class="card">
-        <label>Theme:</label>
-        <select id="theme-select">
-          <option value="dark">Dark</option>
-          <option value="light">Light</option>
-        </select>
-      </div>
-
-      <button class="back-btn">Back</button>
-    </div>
-
+      <section id="activity-section">
+        <h2>Activity</h2>
+        <ul id="activity-log"></ul>
+      </section>
+    </main>
   </div>
 
   <script src="main.js"></script>
