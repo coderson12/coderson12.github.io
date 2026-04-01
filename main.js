@@ -1,6 +1,6 @@
-// Simple multiplayer-on-one-keyboard piano game
+// Simple FL-Studio-like step sequencer with sample upload + export
 
-// ---- Audio setup ----
+// ---- Audio context ----
 let audioCtx;
 function getAudioContext() {
   if (!audioCtx) {
@@ -9,192 +9,323 @@ function getAudioContext() {
   return audioCtx;
 }
 
-function playTone(freq, duration = 0.25) {
+// ---- Default samples (simple synthesized drums) ----
+async function createDefaultBuffer(type) {
   const ctx = getAudioContext();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
+  const sampleRate = ctx.sampleRate;
+  const length = sampleRate * 0.5;
+  const buffer = ctx.createBuffer(1, length, sampleRate);
+  const data = buffer.getChannelData(0);
 
-  osc.type = "sine";
-  osc.frequency.value = freq;
-
-  gain.gain.setValueAtTime(0.001, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-
-  osc.start();
-  osc.stop(ctx.currentTime + duration + 0.05);
-}
-
-// ---- Note mapping ----
-// We'll map keys to a chromatic scale starting around C3
-// White keys: base notes; Shift+key: black notes (sharp above)
-const baseFreq = 130.81; // C3
-const semitone = Math.pow(2, 1 / 12);
-
-function noteFreq(stepsFromBase) {
-  return baseFreq * Math.pow(semitone, stepsFromBase);
-}
-
-// Define a sequence of white-key steps (relative semitones)
-const whiteSteps = [0, 2, 4, 5, 7, 9, 11]; // C D E F G A B pattern repeated
-
-// Build a long list of white-note semitone offsets
-const whiteOffsets = [];
-for (let octave = 0; octave < 5; octave++) {
-  for (let i = 0; i < whiteSteps.length; i++) {
-    whiteOffsets.push(whiteSteps[i] + octave * 12);
+  if (type === "kick") {
+    for (let i = 0; i < length; i++) {
+      const t = i / sampleRate;
+      const env = Math.exp(-t * 10);
+      const freq = 150 * Math.exp(-t * 20);
+      data[i] = env * Math.sin(2 * Math.PI * freq * t);
+    }
+  } else if (type === "snare") {
+    for (let i = 0; i < length; i++) {
+      const t = i / sampleRate;
+      const env = Math.exp(-t * 20);
+      data[i] = env * (Math.random() * 2 - 1);
+    }
+  } else if (type === "hat") {
+    for (let i = 0; i < length; i++) {
+      const t = i / sampleRate;
+      const env = Math.exp(-t * 40);
+      data[i] = env * (Math.random() * 2 - 1);
+    }
+  } else if (type === "clap") {
+    for (let i = 0; i < length; i++) {
+      const t = i / sampleRate;
+      const env = Math.exp(-t * 15);
+      const noise = (Math.random() * 2 - 1) * 0.7;
+      data[i] = env * noise;
+    }
   }
+
+  return buffer;
 }
 
-// Keyboard layout for white keys (long row)
-const whiteKeysOrder = [
-  "1","2","3","4","5","6","7","8","9","0","-","=",
-  "q","w","e","r","t","y","u","i","o","p","[","]",
-  "a","s","d","f","g","h","j","k","l",";","'",
-  "z","x","c","v","b","n","m"
+// ---- Track setup ----
+const trackDefs = [
+  { name: "Kick", type: "kick" },
+  { name: "Snare", type: "snare" },
+  { name: "Hi-Hat", type: "hat" },
+  { name: "Clap", type: "clap" }
 ];
 
-// Map key -> semitone offset index
-const keyToOffset = {};
-whiteKeysOrder.forEach((key, idx) => {
-  if (idx < whiteOffsets.length) {
-    keyToOffset[key] = whiteOffsets[idx];
+const NUM_STEPS = 16;
+
+const tracks = []; // {name, buffer, volume, steps[], elements}
+
+const tracksContainer = document.getElementById("tracks");
+const bpmSlider = document.getElementById("bpm");
+const bpmValue = document.getElementById("bpm-value");
+const playBtn = document.getElementById("play-btn");
+const stopBtn = document.getElementById("stop-btn");
+const exportBtn = document.getElementById("export-btn");
+
+bpmValue.textContent = bpmSlider.value;
+
+// Build UI + load default buffers
+(async function initTracks() {
+  for (const def of trackDefs) {
+    const buffer = await createDefaultBuffer(def.type);
+    const track = {
+      name: def.name,
+      buffer,
+      volume: 0.8,
+      steps: new Array(NUM_STEPS).fill(false),
+      elements: {}
+    };
+    tracks.push(track);
+    createTrackRow(track);
   }
-});
+})();
 
-// For black notes: Shift + key = +1 semitone above that white note
-// (if it exists and isn't E/B which don't have sharps in this simple layout)
+// ---- Create track row UI ----
+function createTrackRow(track) {
+  const row = document.createElement("div");
+  row.className = "track-row";
 
-// ---- DOM elements ----
-const playerNameInput = document.getElementById("player-name-input");
-const joinBtn = document.getElementById("join-btn");
-const playersList = document.getElementById("players-list");
-const activityLog = document.getElementById("activity-log");
-const pianoVisual = document.getElementById("piano-visual");
+  const info = document.createElement("div");
+  info.className = "track-info";
 
-let currentPlayerName = "Guest";
+  const nameEl = document.createElement("div");
+  nameEl.className = "track-name";
+  nameEl.textContent = track.name;
 
-// ---- Players (local only) ----
-const players = new Set();
+  const controls = document.createElement("div");
+  controls.className = "track-controls";
 
-joinBtn.addEventListener("click", () => {
-  const name = playerNameInput.value.trim() || "Guest";
-  currentPlayerName = name;
-  players.add(name);
-  renderPlayers();
-});
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = "audio/*";
 
-function renderPlayers() {
-  playersList.innerHTML = "";
-  players.forEach(name => {
-    const li = document.createElement("li");
-    li.textContent = name;
-    playersList.appendChild(li);
+  fileInput.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const arrayBuffer = await file.arrayBuffer();
+    const ctx = getAudioContext();
+    ctx.decodeAudioData(arrayBuffer, decoded => {
+      track.buffer = decoded;
+    });
   });
+
+  const volLabel = document.createElement("span");
+  volLabel.textContent = "Vol";
+
+  const volSlider = document.createElement("input");
+  volSlider.type = "range";
+  volSlider.min = 0;
+  volSlider.max = 1;
+  volSlider.step = 0.01;
+  volSlider.value = track.volume;
+
+  volSlider.addEventListener("input", () => {
+    track.volume = parseFloat(volSlider.value);
+  });
+
+  controls.appendChild(fileInput);
+  controls.appendChild(volLabel);
+  controls.appendChild(volSlider);
+
+  info.appendChild(nameEl);
+  info.appendChild(controls);
+
+  row.appendChild(info);
+
+  // Steps
+  const stepEls = [];
+  for (let i = 0; i < NUM_STEPS; i++) {
+    const step = document.createElement("div");
+    step.className = "step";
+    step.dataset.index = i;
+
+    step.addEventListener("click", () => {
+      track.steps[i] = !track.steps[i];
+      step.classList.toggle("active", track.steps[i]);
+    });
+
+    row.appendChild(step);
+    stepEls.push(step);
+  }
+
+  track.elements.row = row;
+  track.elements.steps = stepEls;
+
+  tracksContainer.appendChild(row);
 }
 
-// ---- Piano visual build ----
-function buildPianoVisual() {
-  pianoVisual.innerHTML = "";
+// ---- Sequencer ----
+let isPlaying = false;
+let currentStep = 0;
+let timerId = null;
 
-  whiteKeysOrder.forEach((key, idx) => {
-    const offset = keyToOffset[key];
-    if (offset === undefined) return;
+function scheduleNextStep() {
+  if (!isPlaying) return;
 
-    const whiteKey = document.createElement("div");
-    whiteKey.className = "white-key";
-    whiteKey.dataset.key = key;
-    whiteKey.dataset.offset = offset;
+  const bpm = parseInt(bpmSlider.value, 10);
+  const stepDurationMs = (60_000 / bpm) / 4; // 16 steps per bar
 
-    const label = document.createElement("div");
-    label.className = "key-label";
-    label.textContent = key;
-    whiteKey.appendChild(label);
+  // Visual current step
+  tracks.forEach(track => {
+    track.elements.steps.forEach((el, idx) => {
+      el.classList.toggle("current", idx === currentStep);
+    });
+  });
 
-    pianoVisual.appendChild(whiteKey);
+  // Play active steps
+  const ctx = getAudioContext();
+  const now = ctx.currentTime;
 
-    // Decide if this white note has a black note above it (no sharps for E/B)
-    const semitoneInOctave = offset % 12;
-    if (![4, 11].includes(semitoneInOctave)) {
-      const blackKey = document.createElement("div");
-      blackKey.className = "black-key";
-      blackKey.dataset.key = key + "_sharp";
-      blackKey.dataset.offset = offset + 1;
+  tracks.forEach(track => {
+    if (track.steps[currentStep] && track.buffer) {
+      const src = ctx.createBufferSource();
+      src.buffer = track.buffer;
 
-      const blabel = document.createElement("div");
-      blabel.className = "key-label";
-      blabel.textContent = "Shift+" + key;
-      blackKey.appendChild(blabel);
+      const gain = ctx.createGain();
+      gain.gain.value = track.volume;
 
-      pianoVisual.appendChild(blackKey);
+      src.connect(gain);
+      gain.connect(ctx.destination);
+
+      src.start(now);
     }
   });
+
+  currentStep = (currentStep + 1) % NUM_STEPS;
+  timerId = setTimeout(scheduleNextStep, stepDurationMs);
 }
 
-buildPianoVisual();
-
-// ---- Activity log ----
-function logActivity(player, noteName, isSharp) {
-  const li = document.createElement("li");
-  li.innerHTML = `<span class="player">${player}</span> played <span class="note">${noteName}${isSharp ? "♯" : ""}</span>`;
-  activityLog.prepend(li);
-
-  // Limit log size
-  if (activityLog.children.length > 40) {
-    activityLog.removeChild(activityLog.lastChild);
-  }
-}
-
-// ---- Key handling ----
-function offsetToNoteName(offset) {
-  const names = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-  const octave = 3 + Math.floor(offset / 12);
-  const name = names[offset % 12];
-  return { name, octave };
-}
-
-function flashKey(keyId, isSharp) {
-  const selector = isSharp
-    ? `.black-key[data-key="${keyId}"]`
-    : `.white-key[data-key="${keyId}"]`;
-
-  const el = pianoVisual.querySelector(selector);
-  if (!el) return;
-  el.classList.add("key-active");
-  setTimeout(() => el.classList.remove("key-active"), 120);
-}
-
-document.addEventListener("keydown", (e) => {
-  // Avoid repeating when holding key
-  if (e.repeat) return;
-
-  const key = e.key.toLowerCase();
-  const isShift = e.shiftKey;
-
-  if (!keyToOffset[key]) return;
-
-  let offset = keyToOffset[key];
-  let isSharp = false;
-
-  // If Shift, try to play black note above
-  if (isShift) {
-    const semitoneInOctave = offset % 12;
-    if (![4, 11].includes(semitoneInOctave)) {
-      offset = offset + 1;
-      isSharp = true;
-    }
-  }
-
-  const freq = noteFreq(offset);
-  playTone(freq);
-
-  const { name, octave } = offsetToNoteName(offset);
-  logActivity(currentPlayerName, name + octave, isSharp);
-
-  const keyId = isSharp ? key + "_sharp" : key;
-  flashKey(keyId, isSharp);
+playBtn.addEventListener("click", () => {
+  if (isPlaying) return;
+  getAudioContext(); // ensure context exists
+  isPlaying = true;
+  currentStep = 0;
+  scheduleNextStep();
 });
+
+stopBtn.addEventListener("click", () => {
+  isPlaying = false;
+  clearTimeout(timerId);
+  tracks.forEach(track => {
+    track.elements.steps.forEach(el => el.classList.remove("current"));
+  });
+});
+
+bpmSlider.addEventListener("input", () => {
+  bpmValue.textContent = bpmSlider.value;
+});
+
+// ---- Export loop ----
+exportBtn.addEventListener("click", async () => {
+  const bpm = parseInt(bpmSlider.value, 10);
+  const ctx = getAudioContext();
+
+  const bars = 1;
+  const secondsPerBeat = 60 / bpm;
+  const secondsPerBar = secondsPerBeat * 4;
+  const totalDuration = secondsPerBar * bars;
+
+  const offlineCtx = new OfflineAudioContext(
+    2,
+    Math.ceil(ctx.sampleRate * totalDuration),
+    ctx.sampleRate
+  );
+
+  const stepDuration = secondsPerBar / NUM_STEPS;
+
+  tracks.forEach(track => {
+    if (!track.buffer) return;
+
+    for (let stepIndex = 0; stepIndex < NUM_STEPS; stepIndex++) {
+      if (!track.steps[stepIndex]) continue;
+
+      const time = stepIndex * stepDuration;
+      const src = offlineCtx.createBufferSource();
+      src.buffer = track.buffer;
+
+      const gain = offlineCtx.createGain();
+      gain.gain.value = track.volume;
+
+      src.connect(gain);
+      gain.connect(offlineCtx.destination);
+
+      src.start(time);
+    }
+  });
+
+  const rendered = await offlineCtx.startRendering();
+  const wavBlob = bufferToWavBlob(rendered);
+  const url = URL.createObjectURL(wavBlob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "beat.wav";
+  a.click();
+
+  URL.revokeObjectURL(url);
+});
+
+// ---- Convert AudioBuffer to WAV Blob ----
+function bufferToWavBlob(buffer) {
+  const numOfChan = buffer.numberOfChannels;
+  const length = buffer.length * numOfChan * 2 + 44;
+  const bufferArray = new ArrayBuffer(length);
+  const view = new DataView(bufferArray);
+
+  let offset = 0;
+  let pos = 0;
+
+  function setUint16(data) {
+    view.setUint16(pos, data, true);
+    pos += 2;
+  }
+
+  function setUint32(data) {
+    view.setUint32(pos, data, true);
+    pos += 4;
+  }
+
+  // RIFF chunk descriptor
+  setUint32(0x46464952); // "RIFF"
+  setUint32(length - 8); // file length - 8
+  setUint32(0x45564157); // "WAVE"
+
+  // FMT sub-chunk
+  setUint32(0x20746d66); // "fmt "
+  setUint32(16); // size
+  setUint16(1); // PCM
+  setUint16(numOfChan);
+  setUint32(buffer.sampleRate);
+  setUint32(buffer.sampleRate * numOfChan * 2);
+  setUint16(numOfChan * 2);
+  setUint16(16);
+
+  // data sub-chunk
+  setUint32(0x61746164); // "data"
+  setUint32(length - pos - 4);
+
+  // Write interleaved data
+  const channels = [];
+  for (let i = 0; i < numOfChan; i++) {
+    channels.push(buffer.getChannelData(i));
+  }
+
+  let sample;
+  while (pos < length) {
+    for (let i = 0; i < numOfChan; i++) {
+      sample = Math.max(-1, Math.min(1, channels[i][offset]));
+      sample = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+      view.setInt16(pos, sample, true);
+      pos += 2;
+    }
+    offset++;
+  }
+
+  return new Blob([bufferArray], { type: "audio/wav" });
+}
 
