@@ -1,220 +1,200 @@
-// -----------------------------
-// SCREEN SWITCHING
-// -----------------------------
-function show(screen) {
-  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
-  document.getElementById(screen).classList.add("active");
-}
+// Simple multiplayer-on-one-keyboard piano game
 
-// -----------------------------
-// USER SYSTEM
-// -----------------------------
-function getUsers() {
-  return JSON.parse(localStorage.getItem("users") || "{}");
-}
-
-function saveUser(username, password) {
-  const users = getUsers();
-  users[username] = password;
-  localStorage.setItem("users", JSON.stringify(users));
-}
-
-function validateUser(username, password) {
-  const users = getUsers();
-  return users[username] === password;
-}
-
-let currentUser = null;
-
-// -----------------------------
-// QUIZ STORAGE
-// -----------------------------
-function getQuizzes() {
-  return JSON.parse(localStorage.getItem("quizzes") || "[]");
-}
-
-function saveQuiz(quiz) {
-  const quizzes = getQuizzes();
-  quizzes.push(quiz);
-  localStorage.setItem("quizzes", JSON.stringify(quizzes));
-}
-
-// -----------------------------
-// LOGIN / SIGNUP
-// -----------------------------
-document.getElementById("login-btn").onclick = () => show("auth-screen");
-
-document.getElementById("auth-login").onclick = () => {
-  const user = auth-user.value.trim();
-  const pass = auth-pass.value.trim();
-
-  if (validateUser(user, pass)) {
-    currentUser = user;
-    auth-msg.textContent = "Logged in!";
-    setTimeout(() => show("home-screen"), 600);
-  } else {
-    auth-msg.textContent = "Invalid login";
+// ---- Audio setup ----
+let audioCtx;
+function getAudioContext() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
-};
+  return audioCtx;
+}
 
-document.getElementById("auth-signup").onclick = () => {
-  const user = auth-user.value.trim();
-  const pass = auth-pass.value.trim();
+function playTone(freq, duration = 0.25) {
+  const ctx = getAudioContext();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
 
-  if (!user || !pass) {
-    auth-msg.textContent = "Enter username & password";
-    return;
+  osc.type = "sine";
+  osc.frequency.value = freq;
+
+  gain.gain.setValueAtTime(0.001, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start();
+  osc.stop(ctx.currentTime + duration + 0.05);
+}
+
+// ---- Note mapping ----
+// We'll map keys to a chromatic scale starting around C3
+// White keys: base notes; Shift+key: black notes (sharp above)
+const baseFreq = 130.81; // C3
+const semitone = Math.pow(2, 1 / 12);
+
+function noteFreq(stepsFromBase) {
+  return baseFreq * Math.pow(semitone, stepsFromBase);
+}
+
+// Define a sequence of white-key steps (relative semitones)
+const whiteSteps = [0, 2, 4, 5, 7, 9, 11]; // C D E F G A B pattern repeated
+
+// Build a long list of white-note semitone offsets
+const whiteOffsets = [];
+for (let octave = 0; octave < 5; octave++) {
+  for (let i = 0; i < whiteSteps.length; i++) {
+    whiteOffsets.push(whiteSteps[i] + octave * 12);
   }
-
-  saveUser(user, pass);
-  auth-msg.textContent = "Account created!";
-};
-
-// -----------------------------
-// PLAY SCREEN
-// -----------------------------
-document.getElementById("play-btn").onclick = () => {
-  loadQuizList();
-  show("play-screen");
-};
-
-function loadQuizList() {
-  const list = document.getElementById("quiz-list");
-  list.innerHTML = "";
-
-  const quizzes = getQuizzes();
-
-  quizzes.forEach((quiz, index) => {
-    const btn = document.createElement("button");
-    btn.textContent = quiz.title;
-    btn.onclick = () => startGame(index);
-    list.appendChild(btn);
-  });
 }
 
-// -----------------------------
-// GAME LOGIC
-// -----------------------------
-let currentQuiz = null;
-let qIndex = 0;
-let score = 0;
+// Keyboard layout for white keys (long row)
+const whiteKeysOrder = [
+  "1","2","3","4","5","6","7","8","9","0","-","=",
+  "q","w","e","r","t","y","u","i","o","p","[","]",
+  "a","s","d","f","g","h","j","k","l",";","'",
+  "z","x","c","v","b","n","m"
+];
 
-function startGame(index) {
-  currentQuiz = getQuizzes()[index];
-  qIndex = 0;
-  score = 0;
-  show("game-screen");
-  loadQuestion();
-}
-
-function loadQuestion() {
-  const q = currentQuiz.questions[qIndex];
-  document.getElementById("game-question").textContent = q.q;
-
-  const optionsDiv = document.getElementById("game-options");
-  optionsDiv.innerHTML = "";
-
-  q.options.forEach((opt, i) => {
-    const div = document.createElement("div");
-    div.className = "option";
-    div.textContent = opt;
-
-    div.onclick = () => {
-      document.querySelectorAll(".option").forEach(o => o.classList.remove("selected"));
-      div.classList.add("selected");
-      document.getElementById("game-next").classList.remove("hidden");
-      div.dataset.index = i;
-    };
-
-    optionsDiv.appendChild(div);
-  });
-
-  document.getElementById("game-next").onclick = () => {
-    const selected = document.querySelector(".option.selected");
-    if (!selected) return;
-
-    if (parseInt(selected.dataset.index) === q.answer) score++;
-
-    qIndex++;
-
-    if (qIndex >= currentQuiz.questions.length) {
-      showResults();
-    } else {
-      loadQuestion();
-    }
-  };
-}
-
-function showResults() {
-  document.getElementById("result-score").textContent =
-    `You scored ${score} / ${currentQuiz.questions.length}`;
-  show("result-screen");
-}
-
-document.getElementById("result-home").onclick = () => show("home-screen");
-
-// -----------------------------
-// CREATE QUIZ
-// -----------------------------
-document.getElementById("create-btn").onclick = () => show("create-screen");
-
-document.getElementById("add-question").onclick = () => {
-  const container = document.getElementById("questions-container");
-
-  const block = document.createElement("div");
-  block.className = "card";
-  block.innerHTML = `
-    <input class="q-text" type="text" placeholder="Question">
-    <input class="q-opt" type="text" placeholder="Option 1">
-    <input class="q-opt" type="text" placeholder="Option 2">
-    <input class="q-opt" type="text" placeholder="Option 3">
-    <input class="q-opt" type="text" placeholder="Option 4">
-    <input class="q-answer" type="number" min="1" max="4" placeholder="Correct Option #">
-  `;
-
-  container.appendChild(block);
-};
-
-document.getElementById("save-quiz").onclick = () => {
-  const title = document.getElementById("quiz-title").value.trim();
-  const blocks = document.querySelectorAll("#questions-container .card");
-
-  const questions = [];
-
-  blocks.forEach(block => {
-    const q = block.querySelector(".q-text").value;
-    const opts = [...block.querySelectorAll(".q-opt")].map(i => i.value);
-    const ans = parseInt(block.querySelector(".q-answer").value) - 1;
-
-    if (q && opts.every(o => o) && ans >= 0) {
-      questions.push({ q, options: opts, answer: ans });
-    }
-  });
-
-  if (!title || questions.length === 0) return alert("Fill everything!");
-
-  saveQuiz({ title, questions });
-
-  alert("Quiz saved!");
-  show("home-screen");
-};
-
-// -----------------------------
-// SETTINGS
-// -----------------------------
-document.getElementById("settings-btn").onclick = () => show("settings-screen");
-
-document.getElementById("theme-select").onchange = (e) => {
-  if (e.target.value === "light") {
-    document.body.classList.add("light");
-  } else {
-    document.body.classList.remove("light");
+// Map key -> semitone offset index
+const keyToOffset = {};
+whiteKeysOrder.forEach((key, idx) => {
+  if (idx < whiteOffsets.length) {
+    keyToOffset[key] = whiteOffsets[idx];
   }
-};
-
-// -----------------------------
-// BACK BUTTONS
-// -----------------------------
-document.querySelectorAll(".back-btn").forEach(btn => {
-  btn.onclick = () => show("home-screen");
 });
+
+// For black notes: Shift + key = +1 semitone above that white note
+// (if it exists and isn't E/B which don't have sharps in this simple layout)
+
+// ---- DOM elements ----
+const playerNameInput = document.getElementById("player-name-input");
+const joinBtn = document.getElementById("join-btn");
+const playersList = document.getElementById("players-list");
+const activityLog = document.getElementById("activity-log");
+const pianoVisual = document.getElementById("piano-visual");
+
+let currentPlayerName = "Guest";
+
+// ---- Players (local only) ----
+const players = new Set();
+
+joinBtn.addEventListener("click", () => {
+  const name = playerNameInput.value.trim() || "Guest";
+  currentPlayerName = name;
+  players.add(name);
+  renderPlayers();
+});
+
+function renderPlayers() {
+  playersList.innerHTML = "";
+  players.forEach(name => {
+    const li = document.createElement("li");
+    li.textContent = name;
+    playersList.appendChild(li);
+  });
+}
+
+// ---- Piano visual build ----
+function buildPianoVisual() {
+  pianoVisual.innerHTML = "";
+
+  whiteKeysOrder.forEach((key, idx) => {
+    const offset = keyToOffset[key];
+    if (offset === undefined) return;
+
+    const whiteKey = document.createElement("div");
+    whiteKey.className = "white-key";
+    whiteKey.dataset.key = key;
+    whiteKey.dataset.offset = offset;
+
+    const label = document.createElement("div");
+    label.className = "key-label";
+    label.textContent = key;
+    whiteKey.appendChild(label);
+
+    pianoVisual.appendChild(whiteKey);
+
+    // Decide if this white note has a black note above it (no sharps for E/B)
+    const semitoneInOctave = offset % 12;
+    if (![4, 11].includes(semitoneInOctave)) {
+      const blackKey = document.createElement("div");
+      blackKey.className = "black-key";
+      blackKey.dataset.key = key + "_sharp";
+      blackKey.dataset.offset = offset + 1;
+
+      const blabel = document.createElement("div");
+      blabel.className = "key-label";
+      blabel.textContent = "Shift+" + key;
+      blackKey.appendChild(blabel);
+
+      pianoVisual.appendChild(blackKey);
+    }
+  });
+}
+
+buildPianoVisual();
+
+// ---- Activity log ----
+function logActivity(player, noteName, isSharp) {
+  const li = document.createElement("li");
+  li.innerHTML = `<span class="player">${player}</span> played <span class="note">${noteName}${isSharp ? "♯" : ""}</span>`;
+  activityLog.prepend(li);
+
+  // Limit log size
+  if (activityLog.children.length > 40) {
+    activityLog.removeChild(activityLog.lastChild);
+  }
+}
+
+// ---- Key handling ----
+function offsetToNoteName(offset) {
+  const names = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+  const octave = 3 + Math.floor(offset / 12);
+  const name = names[offset % 12];
+  return { name, octave };
+}
+
+function flashKey(keyId, isSharp) {
+  const selector = isSharp
+    ? `.black-key[data-key="${keyId}"]`
+    : `.white-key[data-key="${keyId}"]`;
+
+  const el = pianoVisual.querySelector(selector);
+  if (!el) return;
+  el.classList.add("key-active");
+  setTimeout(() => el.classList.remove("key-active"), 120);
+}
+
+document.addEventListener("keydown", (e) => {
+  // Avoid repeating when holding key
+  if (e.repeat) return;
+
+  const key = e.key.toLowerCase();
+  const isShift = e.shiftKey;
+
+  if (!keyToOffset[key]) return;
+
+  let offset = keyToOffset[key];
+  let isSharp = false;
+
+  // If Shift, try to play black note above
+  if (isShift) {
+    const semitoneInOctave = offset % 12;
+    if (![4, 11].includes(semitoneInOctave)) {
+      offset = offset + 1;
+      isSharp = true;
+    }
+  }
+
+  const freq = noteFreq(offset);
+  playTone(freq);
+
+  const { name, octave } = offsetToNoteName(offset);
+  logActivity(currentPlayerName, name + octave, isSharp);
+
+  const keyId = isSharp ? key + "_sharp" : key;
+  flashKey(keyId, isSharp);
+});
+
