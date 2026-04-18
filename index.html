@@ -1,39 +1,132 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Web Beat Studio</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <title>KeyLet · Home</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="app">
-    <header>
-      <h1>Web Beat Studio</h1>
-      <p>Create beats, upload your own sounds, and export your loop.</p>
-    </header>
-
-    <section id="controls">
-      <div class="control-group">
-        <label for="bpm">BPM</label>
-        <input type="range" id="bpm" min="60" max="200" value="120">
-        <span id="bpm-value">120</span>
+  <div class="frame">
+    <div class="frame-header">
+      <div class="logo-pill">
+        <div class="logo-icon"></div>
+        <div>
+          <div class="logo-text-main">KEYLET</div>
+          <div class="logo-text-sub">A tiny key‑puzzle world</div>
+        </div>
       </div>
-      <div class="control-group">
-        <button id="play-btn">Play</button>
-        <button id="stop-btn">Stop</button>
-        <button id="export-btn">Export Loop</button>
+      <div class="header-right">
+        <div class="chip">
+          <div class="chip-dot"></div>
+          prototype build · 0.0.1
+        </div>
+        <button class="header-btn">Docs</button>
+        <button class="header-btn">GitHub</button>
       </div>
-    </section>
+    </div>
 
-    <section id="tracks">
-      <!-- Tracks will be injected by JS -->
-    </section>
+    <div class="frame-main">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Home · KeyLet</div>
+          <div class="panel-badges">
+            <div class="badge">2D engine</div>
+            <div class="badge">Keyboard puzzles</div>
+          </div>
+        </div>
 
-    <footer>
-      <p>Tip: Click steps to toggle them. Upload your own samples per track.</p>
-    </footer>
+        <div class="hero-title">Unlock the tiny grid.</div>
+        <div class="hero-sub">
+          KeyLet is a compact 2D puzzle game where every key you press reshapes
+          the room. Collect keys, slot them into rounded cylinders, and unlock
+          new paths.
+        </div>
+
+        <div class="hero-cta-row">
+          <button class="btn-pill" id="playBtn">
+            <span>▶</span>
+            <span>Start prototype</span>
+          </button>
+          <button class="btn-ghost">Watch input demo</button>
+        </div>
+
+        <div class="hero-key-row">
+          <div class="key-pill">
+            <div class="key-shape">W</div>
+            move up
+          </div>
+          <div class="key-pill">
+            <div class="key-shape">A</div>
+            move left
+          </div>
+          <div class="key-pill">
+            <div class="key-shape">S</div>
+            move down
+          </div>
+          <div class="key-pill">
+            <div class="key-shape">D</div>
+            move right
+          </div>
+          <div class="key-pill">
+            <div class="key-shape">E</div>
+            interact
+          </div>
+        </div>
+
+        <div class="hint-text">
+          This is the KeyLet homepage. The actual game grid will live behind
+          this UI in your GitHub build.
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="playfield">
+          <div class="playfield-top">
+            <div class="pill-row">
+              <div class="pill">Room · 01</div>
+              <div class="pill">Mode · Prototype</div>
+            </div>
+            <div class="pill">FPS · 60</div>
+          </div>
+
+          <div class="playfield-main">
+            <div class="grid"></div>
+
+            <div class="platform"></div>
+
+            <div class="key-slot">
+              <div class="key-slot-pill">E</div>
+              slot
+            </div>
+
+            <div class="player">K</div>
+
+            <div class="key-token">★</div>
+
+            <div class="side-pill">
+              <div class="side-pill-dot"></div>
+              key channel · idle
+            </div>
+          </div>
+
+          <div class="playfield-bottom">
+            <div class="mini-keys">
+              <div class="mini-key">W</div>
+              <div class="mini-key">A</div>
+              <div class="mini-key">S</div>
+              <div class="mini-key">D</div>
+              <div class="mini-key">E</div>
+            </div>
+            <button class="start-btn-main" id="startBtn">
+              Press any key to begin
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <script src="main.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
+
