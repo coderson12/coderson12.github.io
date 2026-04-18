@@ -6,7 +6,7 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="game-frame">
+  <div class="game-frame" id="gameFrame">
     <header class="top-bar">
       <div class="logo-block">
         <div class="logo-coin-wrap">
@@ -22,7 +22,7 @@
         </div>
       </div>
       <div class="top-right">
-        <div class="tag-pill">build · 0.1.0</div>
+        <div class="tag-pill">build · 0.2.0</div>
         <div class="tag-pill">afk friendly</div>
       </div>
     </header>
@@ -30,8 +30,14 @@
     <main class="layout">
       <section class="panel panel-main">
         <div class="coins-row">
-          <div class="coins-label">Coins</div>
-          <div class="coins-value" id="coinsValue">0.00</div>
+          <div class="coins-label">
+            <img
+              src="https://static.vecteezy.com/system/resources/previews/018/745/974/non_2x/bitcoin-cryptocurrency-in-pixel-art-style-illustration-free-png.png"
+              alt="Coin"
+              class="coins-icon"
+            />
+          </div>
+          <div class="coins-value" id="coinsValue">0</div>
         </div>
 
         <div class="rate-row">
@@ -72,21 +78,20 @@
         </div>
 
         <div class="hint-text">
-          Game idea: like Sol's RNG — you can go AFK, auto‑roll, and stack
-          rarities. Some give passive coin boosts.
+          Space = roll · A = toggle auto · click a rarity to equip its aura /
+          boost.
         </div>
       </section>
 
       <section class="panel panel-side">
-        <div class="panel-title">Rarities</div>
+        <div class="panel-title">Rarities (click to equip)</div>
         <div class="rarity-list" id="rarityList"></div>
       </section>
     </main>
 
     <footer class="bottom-bar">
       <div class="bottom-text">
-        Press <span class="key-chip">SPACE</span> to roll ·
-        <span class="key-chip">A</span> to toggle auto
+        Saves automatically · last session is restored when you come back.
       </div>
     </footer>
   </div>
@@ -94,5 +99,3 @@
   <script src="script.js"></script>
 </body>
 </html>
-
-
