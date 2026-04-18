@@ -7,16 +7,41 @@
 :root {
   --bg: #020617;
   --panel: #020617;
-  --panel-soft: #020617;
-  --border: #1f2937;
+  --border: #111827;
   --accent: #facc15;
   --accent-soft: #fbbf24;
   --text-main: #e5e7eb;
   --text-sub: #9ca3af;
-  --danger: #f97316;
   --good: #22c55e;
+  --danger: #f97316;
   --font-main: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
+}
+
+/* aura themes (very rare) */
+
+.aura-void {
+  --bg: #020617;
+  --panel: #020617;
+  --border: #0f172a;
+  --accent: #a855f7;
+  --accent-soft: #7c3aed;
+}
+
+.aura-aurora {
+  --bg: #022c22;
+  --panel: #022c22;
+  --border: #064e3b;
+  --accent: #22c55e;
+  --accent-soft: #4ade80;
+}
+
+.aura-solar {
+  --bg: #451a03;
+  --panel: #451a03;
+  --border: #7c2d12;
+  --accent: #f97316;
+  --accent-soft: #fdba74;
 }
 
 body {
@@ -35,13 +60,13 @@ body {
   max-width: 100%;
   height: 540px;
   max-height: calc(100vh - 40px);
-  border-radius: 18px;
-  background: #020617;
-  border: 2px solid #111827;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.9);
+  border-radius: 8px;
+  background: var(--bg);
+  border: 3px solid var(--border);
+  box-shadow: 0 0 0 4px #000, 0 18px 40px rgba(0, 0, 0, 0.9);
   display: flex;
   flex-direction: column;
-  padding: 10px 12px;
+  padding: 6px 8px;
 }
 
 /* top bar */
@@ -50,33 +75,32 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #111827;
+  padding-bottom: 4px;
+  border-bottom: 3px solid var(--border);
 }
 
 .logo-block {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
 }
 
 .logo-coin-wrap {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
   background: #000;
-  border: 2px solid #1f2937;
+  border: 3px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  image-rendering: pixelated;
 }
 
 .logo-coin {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   image-rendering: pixelated;
-  mix-blend-mode: multiply; /* helps kill the white background */
+  mix-blend-mode: multiply;
 }
 
 .logo-text {
@@ -86,27 +110,27 @@ body {
 }
 
 .logo-title {
-  font-size: 1rem;
+  font-size: 0.9rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
 .logo-sub {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: var(--text-sub);
 }
 
 .top-right {
   display: flex;
-  gap: 6px;
+  gap: 4px;
 }
 
 .tag-pill {
-  padding: 3px 8px;
-  border-radius: 6px;
-  border: 2px solid #111827;
-  background: #020617;
-  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 0;
+  border: 3px solid var(--border);
+  background: var(--panel);
+  font-size: 0.65rem;
   color: var(--text-sub);
 }
 
@@ -116,18 +140,18 @@ body {
   flex: 1;
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 10px;
-  padding: 8px 0;
+  gap: 6px;
+  padding: 4px 0;
 }
 
 .panel {
-  border-radius: 10px;
-  border: 2px solid #111827;
-  background: #020617;
-  padding: 10px;
+  border-radius: 0;
+  border: 3px solid var(--border);
+  background: var(--panel);
+  padding: 6px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 /* main panel */
@@ -135,49 +159,56 @@ body {
 .coins-row {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
 }
 
 .coins-label {
-  font-size: 0.8rem;
-  color: var(--text-sub);
+  display: flex;
+  align-items: center;
+}
+
+.coins-icon {
+  width: 26px;
+  height: 26px;
+  image-rendering: pixelated;
+  mix-blend-mode: multiply;
 }
 
 .coins-value {
-  font-size: 1.6rem;
+  font-size: 1.4rem;
 }
 
 .rate-row {
   display: flex;
-  gap: 6px;
-  margin-top: 4px;
+  gap: 4px;
+  margin-top: 2px;
 }
 
 .rate-pill {
   flex: 1;
-  padding: 4px 6px;
-  border-radius: 6px;
-  border: 2px solid #111827;
-  background: #020617;
+  padding: 2px 4px;
+  border-radius: 0;
+  border: 3px solid var(--border);
+  background: #000;
   display: flex;
   justify-content: space-between;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: var(--text-sub);
 }
 
 .coin-display {
-  margin-top: 8px;
+  margin-top: 4px;
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 6px;
   align-items: center;
 }
 
 .coin-orbit {
-  width: 100px;
-  height: 100px;
-  border-radius: 999px;
-  border: 2px solid #111827;
+  width: 80px;
+  height: 80px;
+  border-radius: 0;
+  border: 3px solid var(--border);
   background: #000;
   display: flex;
   align-items: center;
@@ -188,14 +219,14 @@ body {
 .coin-orbit::before {
   content: "";
   position: absolute;
-  inset: 8px;
-  border-radius: 999px;
-  border: 2px dashed #1f2937;
+  inset: 6px;
+  border-radius: 0;
+  border: 3px dashed var(--border);
 }
 
 .big-coin {
-  width: 70px;
-  height: 70px;
+  width: 56px;
+  height: 56px;
   image-rendering: pixelated;
   mix-blend-mode: multiply;
 }
@@ -203,37 +234,37 @@ body {
 .last-roll {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .last-roll-label {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: var(--text-sub);
 }
 
 .last-roll-name {
-  font-size: 1rem;
+  font-size: 0.9rem;
 }
 
 .last-roll-desc {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: var(--text-sub);
 }
 
 .controls-row {
-  margin-top: 8px;
+  margin-top: 4px;
   display: flex;
-  gap: 8px;
+  gap: 4px;
 }
 
 .btn {
   flex: 1;
-  padding: 8px 0;
-  border-radius: 6px;
-  border: 2px solid #111827;
-  background: #020617;
+  padding: 6px 0;
+  border-radius: 0;
+  border: 3px solid var(--border);
+  background: #000;
   color: var(--text-main);
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   cursor: pointer;
 }
 
@@ -252,8 +283,8 @@ body {
 }
 
 .hint-text {
-  margin-top: 4px;
-  font-size: 0.7rem;
+  margin-top: 2px;
+  font-size: 0.65rem;
   color: var(--text-sub);
 }
 
@@ -264,26 +295,32 @@ body {
 }
 
 .panel-title {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--text-sub);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .rarity-list {
   flex: 1;
-  border-radius: 6px;
-  border: 2px solid #111827;
-  padding: 6px;
+  border-radius: 0;
+  border: 3px solid var(--border);
+  padding: 4px;
   overflow-y: auto;
-  background: #020617;
+  background: #000;
 }
 
 .rarity-item {
-  padding: 6px;
-  border-radius: 6px;
-  border: 2px solid #111827;
-  margin-bottom: 6px;
-  font-size: 0.75rem;
+  padding: 4px;
+  border-radius: 0;
+  border: 3px solid var(--border);
+  margin-bottom: 4px;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.rarity-item.equipped {
+  background: #111827;
+  border-color: var(--accent-soft);
 }
 
 .rarity-header {
@@ -299,38 +336,21 @@ body {
 
 .rarity-chance {
   color: var(--text-sub);
-  font-size: 0.7rem;
+  font-size: 0.65rem;
 }
 
 .rarity-desc {
   color: var(--text-sub);
-  font-size: 0.7rem;
+  font-size: 0.65rem;
 }
 
 .rarity-owned {
   margin-top: 2px;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: var(--good);
 }
 
-/* bottom bar */
-
-.bottom-bar {
-  padding-top: 6px;
-  border-top: 2px solid #111827;
-  font-size: 0.7rem;
-  color: var(--text-sub);
-}
-
-.key-chip {
-  display: inline-block;
-  padding: 1px 6px;
-  border-radius: 4px;
-  border: 2px solid #111827;
-  background: #020617;
-}
-
-/* rarity colors */
+/* rarity color accents */
 
 .rarity-common {
   border-color: #1f2937;
@@ -354,6 +374,15 @@ body {
 
 .rarity-mythic {
   border-color: #facc15;
+}
+
+/* bottom bar */
+
+.bottom-bar {
+  padding-top: 4px;
+  border-top: 3px solid var(--border);
+  font-size: 0.65rem;
+  color: var(--text-sub);
 }
 
 /* responsive */
